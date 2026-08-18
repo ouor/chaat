@@ -43,15 +43,24 @@ async function get<T>(
   return body.content;
 }
 
+export interface SearchResult {
+  data: SearchChannel[];
+  nextOffset: number | null;
+}
+
 export function searchChannels(
   keyword: string,
   opts: { size?: number; offset?: number } = {},
-): Promise<SearchChannel[]> {
-  return get<{ data: SearchChannel[] }>(SERVICE_BASE, '/service/v1/search/channels', {
-    keyword,
-    size: opts.size ?? 20,
-    offset: opts.offset ?? 0,
-  }).then((c) => c.data);
+): Promise<SearchResult> {
+  return get<{ data: SearchChannel[]; page: { next: { offset: number } | null } }>(
+    SERVICE_BASE,
+    '/service/v1/search/channels',
+    {
+      keyword,
+      size: opts.size ?? 20,
+      offset: opts.offset ?? 0,
+    },
+  ).then((c) => ({ data: c.data, nextOffset: c.page.next?.offset ?? null }));
 }
 
 export function getLiveStatus(channelId: string): Promise<LiveStatus> {
