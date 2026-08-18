@@ -37,7 +37,7 @@ export function useChatSession(
 
   useEffect(() => {
     let cancelled = false;
-    getEmojiPacks(channelId)
+    getEmojiPacks(channelId, auth.cookie)
       .then((emojis) => {
         if (cancelled) return;
         const map: Record<string, string> = {};
@@ -48,7 +48,7 @@ export function useChatSession(
     return () => {
       cancelled = true;
     };
-  }, [channelId]);
+  }, [channelId, auth.cookie]);
 
   useEffect(() => {
     let cancelled = false;
