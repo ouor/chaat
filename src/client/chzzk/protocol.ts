@@ -145,12 +145,17 @@ function messageFromBdy(raw: Record<string, unknown>, chatChannelId: string): Ch
   const bdy = isRecord(raw.bdy) ? raw.bdy : {};
   const profile = safeParseObject(bdy.profile);
 
-  const userIdHash = String(bdy.uid ?? profile.userIdHash ?? '');
+  const userIdHash = String(bdy.uid ?? bdy.userId ?? profile.userIdHash ?? '');
   const nickname = String(profile.nickname ?? bdy.nickname ?? '');
   const role = roleFrom(profile.userRoleCode ?? bdy.role);
   const msgType = msgTypeFrom(bdy.msgTypeCode ?? bdy.messageTypeCode);
   const extras = parseExtras(bdy.extras);
-  const msgTime = typeof bdy.msgTime === 'number' ? bdy.msgTime : 0;
+  const msgTime =
+    typeof bdy.msgTime === 'number'
+      ? bdy.msgTime
+      : typeof bdy.messageTime === 'number'
+        ? bdy.messageTime
+        : 0;
 
   const amount = extras.payAmount ?? extras.donationAmount;
   const donationAmount =
@@ -249,12 +254,25 @@ export function selfCheck(): void {
     bdy: {
       recentMessageCount: 2,
       messageList: [
-        { msgTime: 1, msgTypeCode: 1, msg: 'one', profile: JSON.stringify({ userIdHash: 'a', nickname: 'A' }) },
-        { msgTime: 2, msgTypeCode: 1, content: 'two', profile: JSON.stringify({ userIdHash: 'b', nickname: 'B' }) },
+        {
+          userId: 'a',
+          messageTime: 1700000001000,
+          messageTypeCode: 1,
+          msg: 'one',
+          profile: JSON.stringify({ userIdHash: 'a', nickname: 'A' }),
+        },
+        {
+          userId: 'b',
+          messageTime: 1700000002000,
+          messageTypeCode: 1,
+          content: 'two',
+          profile: JSON.stringify({ userIdHash: 'b', nickname: 'B' }),
+        },
       ],
     },
   });
   assert(recent.length === 2 && recent[1].message === 'two', 'recent parse');
+  assert(recent[0].msgTime === 1700000001000 && recent[1].userIdHash === 'b', 'recent field names');
 
   const send = sendChatMessage('abc', 'hi', 123, '{}', 'sid1');
   assert(send.cmd === Cmd.SEND_CHAT && send.bdy.msg === 'hi' && send.sid === 'sid1', 'send encode');
