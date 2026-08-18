@@ -179,10 +179,27 @@ function messageFromBdy(raw: Record<string, unknown>, chatChannelId: string): Ch
 }
 
 export function parseChatMessage(raw: unknown): ChatMessage | null {
-  if (!isRecord(raw) || typeof raw.cmd !== 'number') return null;
-  if (raw.cmd !== Cmd.CHAT && raw.cmd !== Cmd.DONATION && raw.cmd !== Cmd.NOTICE) return null;
-  if (typeof raw.cid !== 'string') return null;
-  return messageFromBdy(raw, raw.cid);
+  return parseChatMessages(raw)[0] ?? null;
+}
+
+export function parseChatMessages(raw: unknown): ChatMessage[] {
+  if (!isRecord(raw) || typeof raw.cmd !== 'number') return [];
+  if (raw.cmd !== Cmd.CHAT && raw.cmd !== Cmd.DONATION && raw.cmd !== Cmd.NOTICE) return [];
+  if (typeof raw.cid !== 'string') return [];
+
+  // Live frames (cmd 93101/93102) carry `bdy` as an ARRAY of message objects, one per chat.
+  const bdy = raw.bdy;
+  if (Array.isArray(bdy)) {
+    const out: ChatMessage[] = [];
+    for (const item of bdy) {
+      if (!isRecord(item)) continue;
+      const m = messageFromBdy({ ...raw, bdy: item }, raw.cid);
+      if (m) out.push(m);
+    }
+    return out;
+  }
+  const m = messageFromBdy(raw, raw.cid);
+  return m ? [m] : [];
 }
 
 export function parseRecentChat(raw: unknown): ChatMessage[] {
@@ -246,6 +263,34 @@ export function selfCheck(): void {
     bdy: { noticeMessage: '공지', nickname: 'host', role: 'streamer' },
   });
   assert(notice?.message === '공지' && notice.role === 'streamer', 'notice parse');
+
+  // Live chat frames carry bdy as an ARRAY of message objects.
+  const live = parseChatMessages({
+    ver: '1',
+    cmd: Cmd.CHAT,
+    tid: '3',
+    cid: 'abc',
+    bdy: [
+      {
+        uid: 'u1',
+        msg: 'hello',
+        msgTypeCode: 1,
+        msgTime: 1700000003000,
+        profile: JSON.stringify({ userIdHash: 'u1', nickname: '쒼만두', userRoleCode: 'common_user' }),
+      },
+      {
+        uid: 'u2',
+        msg: 'second',
+        msgTypeCode: 10,
+        msgTime: 1700000004000,
+        extras: JSON.stringify({ payAmount: '3000' }),
+        profile: JSON.stringify({ userIdHash: 'u2', nickname: 'yuna', userRoleCode: 'streaming_chat_manager' }),
+      },
+    ],
+  });
+  assert(live.length === 2, 'live array parse');
+  assert(live[0].nickname === '쒼만두' && live[0].message === 'hello' && live[0].msgTime === 1700000003000, 'live first');
+  assert(live[1].msgType === 'donation' && live[1].donationAmount === 3000 && live[1].role === 'manager', 'live second');
 
   const recent = parseRecentChat({
     ver: '2',

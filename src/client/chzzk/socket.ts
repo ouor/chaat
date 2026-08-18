@@ -1,7 +1,7 @@
 import {
   Cmd,
   connectMessage,
-  parseChatMessage,
+  parseChatMessages,
   parseRecentChat,
   pingMessage,
   pongMessage,
@@ -94,6 +94,9 @@ export class ChatSocket {
     }
     if (typeof raw !== 'object' || raw === null) return;
     const cmd = (raw as { cmd?: number }).cmd;
+    if (cmd !== Cmd.PING && cmd !== Cmd.PONG) {
+      console.log('[ws] cmd', cmd);
+    }
 
     if (cmd === Cmd.PING) {
       this.ws?.send(JSON.stringify(pongMessage()));
@@ -109,11 +112,19 @@ export class ChatSocket {
       this.requestRecent(50);
     }
     if (cmd === Cmd.CHAT || cmd === Cmd.DONATION || cmd === Cmd.NOTICE) {
-      const m = parseChatMessage(raw);
-      if (m) this.opts.onMessage(m);
+      const msgs = parseChatMessages(raw);
+      if (msgs.length === 0) {
+        console.log('[ws] msg PARSE NULL', JSON.stringify(raw).slice(0, 200));
+      }
+      for (const m of msgs) {
+        console.log('[ws] msg', m.msgType, m.nickname, '|', m.message.slice(0, 30), '| t', m.msgTime);
+        this.opts.onMessage(m);
+      }
     }
     if (cmd === Cmd.RECENT_CHAT) {
-      for (const m of parseRecentChat(raw)) this.opts.onMessage(m);
+      const parsed = parseRecentChat(raw);
+      console.log('[ws] recent chat parsed', parsed.length);
+      for (const m of parsed) this.opts.onMessage(m);
     }
   }
 

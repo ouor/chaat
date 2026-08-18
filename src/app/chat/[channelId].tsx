@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -31,9 +31,11 @@ export default function ChatScreen() {
 
   const [draft, setDraft] = useState('');
 
-  // Canonical inverted chat list: the array is reversed so index 0 is the newest message,
-  // which renders at the bottom. New messages auto-stick while scrolled to the bottom.
   const data = useMemo(() => [...messages].reverse(), [messages]);
+
+  useEffect(() => {
+    console.log('[chat-ui] messages=', messages.length, 'data=', data.length, 'conn=', connState);
+  }, [messages.length, data.length, connState]);
 
   const conn = CONN_META[connState] ?? CONN_META.connecting;
   const isLive = liveStatus === 'OPEN';
