@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { getAccessToken, getLiveStatus } from '@/client/chzzk/rest';
 import { ChatSocket, type ConnState } from '@/client/chzzk/socket';
 import type { ChatMessage } from '@/client/chzzk/types';
+import { enqueueLog } from '@/storage/log-repo';
 
 const MAX_MESSAGES = 500;
 
@@ -39,8 +40,12 @@ export function useChatSession(channelId: string): ChatSession {
         socket = new ChatSocket({
           chatChannelId: status.chatChannelId,
           accessToken: token.accessToken,
-          onMessage: (m) =>
-            setMessages((prev) => (prev.length >= MAX_MESSAGES ? [...prev.slice(-(MAX_MESSAGES - 1)), m] : [...prev, m])),
+          onMessage: (m) => {
+            enqueueLog(channelId, m);
+            setMessages((prev) =>
+              prev.length >= MAX_MESSAGES ? [...prev.slice(-(MAX_MESSAGES - 1)), m] : [...prev, m],
+            );
+          },
           onStateChange: setConnState,
         });
         socketRef.current = socket;

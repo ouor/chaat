@@ -91,7 +91,7 @@ export default function ChatScreen() {
             <Text style={[styles.connLabel, { color: theme.mute }]}>{conn.label}</Text>
           </View>
         </View>
-        <Pressable style={styles.headerButton} hitSlop={8}>
+        <Pressable style={styles.headerButton} hitSlop={8} onPress={() => router.push(`/logs/${channelId}`)}>
           <Icon name="more" color={theme.body} />
         </Pressable>
       </SafeAreaView>
