@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
@@ -8,6 +8,8 @@ import { Icon } from '@/components/ui/icon';
 import { Radius, Spacing } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
+import { readNaverCookiesFromWebView } from '@/storage/cookie-reader';
+import type { NaverCookies } from '@/storage/keychain';
 
 const POLL_JS = `(function(){ window.ReactNativeWebView.postMessage(document.cookie); })(); true;`;
 
@@ -20,15 +22,55 @@ function parseCookies(cookie: string): Record<string, string> {
   return out;
 }
 
+function cookiesFromDocumentCookie(cookie: string): NaverCookies | null {
+  const parsed = parseCookies(cookie);
+  if (parsed.NID_AUT && parsed.NID_SES) return { aut: parsed.NID_AUT, ses: parsed.NID_SES };
+  return null;
+}
+
 export default function LoginScreen() {
   const router = useRouter();
   const theme = useTheme();
   const { login } = useAuth();
 
-  const [phase, setPhase] = useState<'idle' | 'webview' | 'fail'>('idle');
+  const [phase, setPhase] = useState<'idle' | 'webview' | 'manual' | 'fail'>('idle');
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [aut, setAut] = useState('');
+  const [ses, setSes] = useState('');
   const webviewRef = useRef<WebView>(null);
   const doneRef = useRef(false);
+
+  useEffect(() => {
+    if (phase !== 'webview') return;
+    const t = setInterval(() => {
+      if (doneRef.current) return;
+      webviewRef.current?.injectJavaScript(POLL_JS);
+      void readNaverCookiesFromWebView().then((c) => {
+        if (c && !doneRef.current) void tryLogin(c);
+      });
+    }, 2000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  async function tryLogin(cookies: NaverCookies): Promise<void> {
+    if (busy || doneRef.current) return;
+    setBusy(true);
+    const ok = await login(cookies);
+    if (ok) {
+      doneRef.current = true;
+      router.back();
+    } else {
+      setBusy(false);
+      setPhase('fail');
+    }
+  }
+
+  function handleMessage(e: { nativeEvent: { data: string } }) {
+    const c = cookiesFromDocumentCookie(e.nativeEvent.data);
+    if (c) void tryLogin(c);
+  }
 
   if (Platform.OS === 'web') {
     return (
@@ -36,28 +78,6 @@ export default function LoginScreen() {
         <Text style={{ color: theme.mute }}>Naver sign-in is not supported on web.</Text>
       </View>
     );
-  }
-
-  function pollCookies() {
-    if (doneRef.current) return;
-    webviewRef.current?.injectJavaScript(POLL_JS);
-  }
-
-  function handleMessage(e: { nativeEvent: { data: string } }) {
-    if (doneRef.current) return;
-    const cookies = parseCookies(e.nativeEvent.data);
-    const aut = cookies.NID_AUT;
-    const ses = cookies.NID_SES;
-    if (!aut || !ses) return;
-    doneRef.current = true;
-    login({ aut, ses }).then((ok) => {
-      if (ok) {
-        router.back();
-      } else {
-        doneRef.current = false;
-        setPhase('fail');
-      }
-    });
   }
 
   return (
@@ -87,13 +107,16 @@ export default function LoginScreen() {
             style={[styles.cta, { backgroundColor: theme.primary }]}>
             <Text style={[styles.ctaText, { color: theme.onPrimary }]}>Continue with Naver</Text>
           </Pressable>
+          <Pressable onPress={() => setPhase('manual')} hitSlop={8}>
+            <Text style={{ color: theme.mute, fontSize: 12.5 }}>or enter cookies manually</Text>
+          </Pressable>
         </View>
       ) : phase === 'fail' ? (
         <View style={styles.center}>
           <Text style={[styles.failLabel, { color: theme.danger }]}>SIGN-IN FAILED</Text>
           <Text style={[styles.title, { color: theme.ink }]}>Session wasn&apos;t returned</Text>
           <Text style={[styles.hint, { color: theme.mute }]}>
-            The sign-in window closed before we got a token. You can keep reading chat while signed out.
+            The sign-in window closed before we got a token. Try again, or enter cookies manually.
           </Text>
           <View style={styles.failButtons}>
             <Pressable
@@ -105,10 +128,44 @@ export default function LoginScreen() {
               style={[styles.cta, { backgroundColor: theme.primary }]}>
               <Text style={[styles.ctaText, { color: theme.onPrimary }]}>Try again</Text>
             </Pressable>
-            <Pressable onPress={() => router.back()} style={[styles.outlineButton, { borderColor: theme.hairline }]}>
-              <Text style={{ color: theme.ink, fontSize: 13, fontWeight: 600 }}>Read-only</Text>
+            <Pressable onPress={() => setPhase('manual')} style={[styles.outlineButton, { borderColor: theme.hairline }]}>
+              <Text style={{ color: theme.ink, fontSize: 13, fontWeight: 600 }}>Manual</Text>
             </Pressable>
           </View>
+        </View>
+      ) : phase === 'manual' ? (
+        <View style={styles.manualWrap}>
+          <Text style={[styles.manualLabel, { color: theme.mute }]}>NID_AUT</Text>
+          <TextInput
+            value={aut}
+            onChangeText={setAut}
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={[
+              styles.manualInput,
+              { backgroundColor: theme.canvasSoft, borderColor: theme.hairline, color: theme.ink },
+            ]}
+          />
+          <Text style={[styles.manualLabel, { color: theme.mute }]}>NID_SES</Text>
+          <TextInput
+            value={ses}
+            onChangeText={setSes}
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={[
+              styles.manualInput,
+              { backgroundColor: theme.canvasSoft, borderColor: theme.hairline, color: theme.ink },
+            ]}
+          />
+          <Pressable
+            onPress={() => void tryLogin({ aut: aut.trim(), ses: ses.trim() })}
+            disabled={busy || !aut.trim() || !ses.trim()}
+            style={[styles.cta, { backgroundColor: theme.primary, opacity: busy || !aut.trim() || !ses.trim() ? 0.5 : 1 }]}>
+            <Text style={[styles.ctaText, { color: theme.onPrimary }]}>{busy ? 'Signing in…' : 'Sign in'}</Text>
+          </Pressable>
+          <Pressable onPress={() => setPhase('idle')} hitSlop={8}>
+            <Text style={{ color: theme.mute, fontSize: 12.5 }}>back</Text>
+          </Pressable>
         </View>
       ) : (
         <View style={styles.webviewWrap}>
@@ -116,16 +173,18 @@ export default function LoginScreen() {
             ref={webviewRef}
             source={{ uri: 'https://nid.naver.com/nidlogin.login' }}
             onNavigationStateChange={(nav) => {
-              if (nav.url.includes('naver.com') && !doneRef.current) pollCookies();
+              if (nav.url.includes('naver.com') && !doneRef.current) webviewRef.current?.injectJavaScript(POLL_JS);
             }}
             onMessage={handleMessage}
             onLoadEnd={() => setLoading(false)}
             style={styles.webview}
           />
-          {loading ? (
+          {loading || busy ? (
             <View style={[styles.overlay, { backgroundColor: theme.canvas }]}>
               <ActivityIndicator color={theme.primary} />
-              <Text style={[styles.overlayText, { color: theme.body }]}>Opening Naver sign-in…</Text>
+              <Text style={[styles.overlayText, { color: theme.body }]}>
+                {busy ? 'Signing in…' : 'Opening Naver sign-in…'}
+              </Text>
             </View>
           ) : null}
         </View>
@@ -160,6 +219,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     paddingVertical: 12,
     borderRadius: Radius.sm,
+    alignItems: 'center',
   },
   ctaText: { fontSize: 15, fontWeight: 600 },
   failLabel: { fontSize: 10, letterSpacing: 1.6, fontFamily: 'monospace' },
@@ -170,6 +230,16 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
     borderWidth: 1,
     justifyContent: 'center',
+  },
+  manualWrap: { padding: Spacing.xl, gap: Spacing.sm },
+  manualLabel: { fontSize: 11, fontFamily: 'monospace', fontWeight: 600 },
+  manualInput: {
+    height: 40,
+    borderWidth: 1,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.md,
+    fontSize: 13,
+    fontFamily: 'monospace',
   },
   webviewWrap: { flex: 1 },
   webview: { flex: 1 },
