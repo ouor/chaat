@@ -50,6 +50,9 @@ export default function HomeScreen() {
         <Pressable onPress={() => router.push('/search')} style={styles.headerButton} hitSlop={8}>
           <Icon name="search" color={theme.body} />
         </Pressable>
+        <Pressable onPress={() => router.push('/settings')} style={styles.headerButton} hitSlop={8}>
+          <Icon name="gear" color={theme.body} />
+        </Pressable>
       </SafeAreaView>
 
       <View style={styles.sectionHeader}>

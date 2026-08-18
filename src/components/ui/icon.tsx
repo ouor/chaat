@@ -38,9 +38,20 @@ const PATHS: Record<IconName, (color: string) => React.ReactNode> = {
       />
     </>
   ),
+  gear: (c) => (
+    <>
+      <Circle cx="8" cy="8" r="2.4" stroke={c} strokeWidth={1.7} fill="none" />
+      <Path
+        d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6l1.4 1.4M13 3l-1.4 1.4M5 11.6L3.6 13"
+        stroke={c}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+      />
+    </>
+  ),
 };
 
-export type IconName = 'back' | 'down' | 'more' | 'search';
+export type IconName = 'back' | 'down' | 'more' | 'search' | 'gear';
 
 export function Icon({
   name,
