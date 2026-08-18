@@ -77,11 +77,13 @@ export const ChatRow = memo(function ChatRow({
   showTime,
   onPress,
   emojiMap,
+  profileImages,
 }: {
   m: ChatMessage;
   showTime: boolean;
   onPress?: () => void;
   emojiMap?: Record<string, string>;
+  profileImages?: Record<string, string>;
 }) {
   const theme = useTheme();
   const { fontScale, chatVariant } = useSettings();
@@ -89,6 +91,7 @@ export const ChatRow = memo(function ChatRow({
   const isCard = chatVariant === 'card';
   const nickColor = theme[nickKey(m.userIdHash)];
   const emojis = emojiMap ?? {};
+  const profileImage = m.profileImageUrl || profileImages?.[m.userIdHash];
 
   const pressableProps = onPress ? { onPress } : {};
 
@@ -129,7 +132,7 @@ export const ChatRow = memo(function ChatRow({
   if (isCard) {
     return (
       <Pressable {...pressableProps} style={styles.cardRow}>
-        <ProfileThumb uri={m.profileImageUrl} name={m.nickname} size={26} />
+        <ProfileThumb uri={profileImage} name={m.nickname} size={26} />
         <View style={styles.cardBody}>
           <View style={styles.cardNickLine}>
             <RoleBadge role={m.role} />
@@ -147,7 +150,7 @@ export const ChatRow = memo(function ChatRow({
   return (
     <Pressable {...pressableProps} style={styles.chatRow}>
       <View style={styles.chatLine}>
-        <ProfileThumb uri={m.profileImageUrl} name={m.nickname} size={18} />
+        <ProfileThumb uri={profileImage} name={m.nickname} size={18} />
         <RoleBadge role={m.role} />
         <Text style={[styles.nick, { color: nickColor }]} numberOfLines={1}>
           {m.nickname}

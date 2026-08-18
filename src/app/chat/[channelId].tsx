@@ -39,7 +39,7 @@ export default function ChatScreen() {
   const isMock = channelId === 'mock';
   const real = useChatSession(channelId, { cookie, uid });
   const mock = useMockChatSession(isMock);
-  const { connState, liveStatus, messages, notice, chatChannelId, streamingChannelId, canModerate, emojiMap, sendChat, retry } =
+  const { connState, liveStatus, messages, notice, chatChannelId, streamingChannelId, canModerate, emojiMap, profileImages, sendChat, retry } =
     isMock ? mock : real;
 
   const [draft, setDraft] = useState('');
@@ -239,7 +239,13 @@ export default function ChatScreen() {
           data={data}
           keyExtractor={(item, index) => `${item.userIdHash}:${item.msgTime}:${index}`}
           renderItem={({ item }) => (
-            <ChatRow m={item} showTime={isEnded} emojiMap={emojiMap} onPress={() => setSelected(item)} />
+            <ChatRow
+              m={item}
+              showTime={isEnded}
+              emojiMap={emojiMap}
+              profileImages={profileImages}
+              onPress={() => setSelected(item)}
+            />
           )}
           onScroll={onScroll}
           scrollEventThrottle={16}

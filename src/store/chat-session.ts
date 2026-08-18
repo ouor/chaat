@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { getAccessToken, getEmojiPacks, getLiveStatus } from '@/client/chzzk/rest';
+import { getAccessToken, getEmojiPacks, getLiveStatus, getProfileCard } from '@/client/chzzk/rest';
 import { ChatSocket, type ConnState } from '@/client/chzzk/socket';
 import type { ChatMessage } from '@/client/chzzk/types';
 import { enqueueLog } from '@/storage/log-repo';
@@ -16,6 +16,7 @@ export interface ChatSession {
   streamingChannelId: string | null;
   canModerate: boolean;
   emojiMap: Record<string, string>;
+  profileImages: Record<string, string>;
   sendChat: (text: string) => void;
   retry: () => void;
 }
@@ -32,8 +33,11 @@ export function useChatSession(
   const [streamingChannelId, setStreamingChannelId] = useState<string | null>(null);
   const [canModerate, setCanModerate] = useState(false);
   const [emojiMap, setEmojiMap] = useState<Record<string, string>>({});
+  const [profileImages, setProfileImages] = useState<Record<string, string>>({});
   const [attempt, setAttempt] = useState(0);
   const socketRef = useRef<ChatSocket | null>(null);
+  const profileImageCache = useRef<Record<string, string>>({});
+  const pendingProfiles = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +83,20 @@ export function useChatSession(
             if (auth.uid && m.userIdHash === auth.uid && (m.role === 'streamer' || m.role === 'manager')) {
               setCanModerate(true);
             }
+            if (!m.profileImageUrl && !profileImageCache.current[m.userIdHash] && !pendingProfiles.current.has(m.userIdHash)) {
+              // ponytail: chat WS profiles omit profileImageUrl, so backfill from profile-card,
+              // deduped per user per session. No concurrency cap yet — add a rate limiter if the API throttles.
+              pendingProfiles.current.add(m.userIdHash);
+              getProfileCard(status.chatChannelId, m.userIdHash, auth.cookie)
+                .then((pc) => {
+                  if (pc.profileImageUrl) {
+                    profileImageCache.current[m.userIdHash] = pc.profileImageUrl;
+                    setProfileImages({ ...profileImageCache.current });
+                  }
+                })
+                .catch(() => undefined)
+                .finally(() => pendingProfiles.current.delete(m.userIdHash));
+            }
             enqueueLog(channelId, m);
             setMessages((prev) =>
               prev.length >= MAX_MESSAGES ? [...prev.slice(-(MAX_MESSAGES - 1)), m] : [...prev, m],
@@ -107,5 +125,17 @@ export function useChatSession(
 
   const retry = useCallback(() => setAttempt((a) => a + 1), []);
 
-  return { connState, liveStatus, chatChannelId, messages, notice, streamingChannelId, canModerate, emojiMap, sendChat, retry };
+  return {
+    connState,
+    liveStatus,
+    chatChannelId,
+    messages,
+    notice,
+    streamingChannelId,
+    canModerate,
+    emojiMap,
+    profileImages,
+    sendChat,
+    retry,
+  };
 }
