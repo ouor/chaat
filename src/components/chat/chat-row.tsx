@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { ChatMessage } from '@/client/chzzk/types';
 import { Radius, Spacing } from '@/constants/tokens';
@@ -46,14 +46,18 @@ function RoleBadge({ role }: { role: ChatMessage['role'] }) {
 export const ChatRow = memo(function ChatRow({
   m,
   showTime,
+  onPress,
 }: {
   m: ChatMessage;
   showTime: boolean;
+  onPress?: () => void;
 }) {
   const theme = useTheme();
   const { fontScale } = useSettings();
   const font = CHAT_FONT[fontScale];
   const nickColor = theme[nickKey(m.userIdHash)];
+
+  const pressableProps = onPress ? { onPress } : {};
 
   if (m.msgType === 'system') {
     return <Text style={[styles.system, { color: theme.mute }]}>{m.message}</Text>;
@@ -62,13 +66,13 @@ export const ChatRow = memo(function ChatRow({
   if (m.msgType === 'donation') {
     const amount = m.donationAmount ? `₩${m.donationAmount.toLocaleString()}` : '';
     return (
-      <View style={[styles.dono, { backgroundColor: theme.canvasSoft, borderLeftColor: theme.primary }]}>
+      <Pressable {...pressableProps} style={[styles.dono, { backgroundColor: theme.canvasSoft, borderLeftColor: theme.primary }]}>
         <View style={styles.donoHead}>
           <Text style={[styles.donoNick, { color: theme.primarySoft }]}>{m.nickname}</Text>
           {amount ? <Text style={[styles.donoAmount, { color: theme.primarySoft }]}>{amount}</Text> : null}
         </View>
         <Text style={[styles.donoMsg, { color: theme.ink, fontSize: font }]}>{m.message}</Text>
-      </View>
+      </Pressable>
     );
   }
 
@@ -82,7 +86,7 @@ export const ChatRow = memo(function ChatRow({
   }
 
   return (
-    <View style={styles.chatRow}>
+    <Pressable {...pressableProps} style={styles.chatRow}>
       <View style={styles.chatLine}>
         <RoleBadge role={m.role} />
         <Text style={[styles.nick, { color: nickColor }]} numberOfLines={1}>
@@ -91,7 +95,7 @@ export const ChatRow = memo(function ChatRow({
         <Text style={[styles.message, { color: theme.ink, fontSize: font }]}>{m.message}</Text>
         {showTime ? <Text style={[styles.time, { color: theme.mute }]}>{fmtTime(m.msgTime)}</Text> : null}
       </View>
-    </View>
+    </Pressable>
   );
 });
 

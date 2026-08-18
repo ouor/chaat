@@ -10,9 +10,11 @@ const MAX_MESSAGES = 500;
 export interface ChatSession {
   connState: ConnState;
   liveStatus: 'OPEN' | 'CLOSE' | null;
+  chatChannelId: string | null;
   messages: ChatMessage[];
   notice: string | null;
   streamingChannelId: string | null;
+  canModerate: boolean;
   sendChat: (text: string) => void;
   retry: () => void;
 }
@@ -23,9 +25,11 @@ export function useChatSession(
 ): ChatSession {
   const [connState, setConnState] = useState<ConnState>('idle');
   const [liveStatus, setLiveStatus] = useState<'OPEN' | 'CLOSE' | null>(null);
+  const [chatChannelId, setChatChannelId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [streamingChannelId, setStreamingChannelId] = useState<string | null>(null);
+  const [canModerate, setCanModerate] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const socketRef = useRef<ChatSocket | null>(null);
 
@@ -42,6 +46,7 @@ export function useChatSession(
         const status = await getLiveStatus(channelId);
         if (cancelled) return;
         setLiveStatus(status.status);
+        setChatChannelId(status.chatChannelId);
 
         const token = await getAccessToken(status.chatChannelId, auth.cookie);
         if (cancelled) return;
@@ -53,6 +58,9 @@ export function useChatSession(
           onMessage: (m) => {
             if (typeof m.extras.streamingChannelId === 'string') {
               setStreamingChannelId(m.extras.streamingChannelId);
+            }
+            if (auth.uid && m.userIdHash === auth.uid && (m.role === 'streamer' || m.role === 'manager')) {
+              setCanModerate(true);
             }
             enqueueLog(channelId, m);
             setMessages((prev) =>
@@ -82,5 +90,5 @@ export function useChatSession(
 
   const retry = useCallback(() => setAttempt((a) => a + 1), []);
 
-  return { connState, liveStatus, messages, notice, streamingChannelId, sendChat, retry };
+  return { connState, liveStatus, chatChannelId, messages, notice, streamingChannelId, canModerate, sendChat, retry };
 }

@@ -3,7 +3,10 @@ import { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { blindMessage } from '@/client/chzzk/rest';
+import type { ChatMessage } from '@/client/chzzk/types';
 import { ChatRow } from '@/components/chat/chat-row';
+import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { Icon } from '@/components/ui/icon';
 import { Radius, Spacing } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
@@ -18,6 +21,12 @@ const CONN_META: Record<string, { label: string; color: 'primarySoft' | 'mute' |
   offline: { label: 'Disconnected', color: 'danger' },
 };
 
+const ROLE_LABEL: Record<ChatMessage['role'], string> = {
+  streamer: 'CHANNEL OWNER',
+  manager: 'MODERATOR',
+  member: 'FOLLOWER',
+};
+
 export default function ChatScreen() {
   const { channelId } = useLocalSearchParams<{ channelId: string }>();
   const router = useRouter();
@@ -27,10 +36,12 @@ export default function ChatScreen() {
   const isMock = channelId === 'mock';
   const real = useChatSession(channelId, { cookie, uid });
   const mock = useMockChatSession(isMock);
-  const { connState, liveStatus, messages, notice, sendChat, retry } = isMock ? mock : real;
+  const { connState, liveStatus, messages, notice, chatChannelId, streamingChannelId, canModerate, sendChat, retry } =
+    isMock ? mock : real;
 
   const [draft, setDraft] = useState('');
   const [noticeOpen, setNoticeOpen] = useState(true);
+  const [selected, setSelected] = useState<ChatMessage | null>(null);
 
   const data = useMemo(() => [...messages].reverse(), [messages]);
 
@@ -43,6 +54,22 @@ export default function ChatScreen() {
     if (!text) return;
     sendChat(text);
     setDraft('');
+  }
+
+  function handleMention() {
+    if (!selected) return;
+    setDraft(`@${selected.nickname} `);
+    setSelected(null);
+  }
+
+  function handleBlind() {
+    if (!selected || !chatChannelId || !cookie || !streamingChannelId) return;
+    void blindMessage(chatChannelId, cookie, {
+      message: selected.message,
+      messageTime: selected.msgTime,
+      messageUserIdHash: selected.userIdHash,
+      streamingChannelId,
+    }).then(() => setSelected(null));
   }
 
   return (
@@ -110,7 +137,7 @@ export default function ChatScreen() {
         inverted
         data={data}
         keyExtractor={(item, index) => `${item.userIdHash}:${item.msgTime}:${index}`}
-        renderItem={({ item }) => <ChatRow m={item} showTime={isEnded} />}
+        renderItem={({ item }) => <ChatRow m={item} showTime={isEnded} onPress={() => setSelected(item)} />}
         style={{ flex: 1, backgroundColor: isEnded ? theme.canvasSoft : theme.canvas }}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
@@ -175,6 +202,37 @@ export default function ChatScreen() {
           </View>
         </View>
       )}
+
+      <BottomSheet visible={!!selected} onClose={() => setSelected(null)}>
+        {selected ? (
+          <View style={styles.sheetBody}>
+            <View style={styles.sheetHead}>
+              <View style={[styles.sheetAvatar, { backgroundColor: theme.canvasSoft, borderColor: theme.hairline }]}>
+                <Text style={[styles.sheetAvatarText, { color: theme.mute }]}>
+                  {(selected.nickname[0] ?? '?').toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.sheetTitle}>
+                <Text style={[styles.sheetNick, { color: theme.ink }]}>{selected.nickname}</Text>
+                <Text style={[styles.sheetMeta, { color: theme.mute }]}>{ROLE_LABEL[selected.role]}</Text>
+              </View>
+            </View>
+            <View style={[styles.sheetMsg, { borderColor: theme.hairline, backgroundColor: theme.canvasSoft }]}>
+              <Text style={[styles.sheetMsgText, { color: theme.body }]}>{selected.message}</Text>
+            </View>
+            <View style={styles.sheetActions}>
+              <Pressable onPress={handleMention} style={[styles.sheetAction, { backgroundColor: theme.primary }]}>
+                <Text style={[styles.sheetActionText, { color: theme.onPrimary }]}>Mention</Text>
+              </Pressable>
+              {canModerate && loggedIn && chatChannelId && streamingChannelId ? (
+                <Pressable onPress={handleBlind} style={[styles.sheetAction, { borderColor: theme.hairline }]}>
+                  <Text style={[styles.sheetActionText, { color: theme.danger }]}>Blind message</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
+      </BottomSheet>
     </View>
   );
 }
@@ -302,4 +360,35 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
   },
   signInText: { fontSize: 13, fontWeight: 600 },
+  sheetBody: { gap: Spacing.lg },
+  sheetHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  sheetAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetAvatarText: { fontSize: 17, fontWeight: 600 },
+  sheetTitle: { flex: 1, gap: 4 },
+  sheetNick: { fontSize: 16, fontWeight: 600 },
+  sheetMeta: { fontSize: 10.5, fontFamily: 'monospace' },
+  sheetMsg: {
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+  },
+  sheetMsgText: { fontSize: 13, lineHeight: 20 },
+  sheetActions: { flexDirection: 'row', gap: Spacing.sm },
+  sheetAction: {
+    flex: 1,
+    height: 44,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetActionText: { fontSize: 14, fontWeight: 600 },
 });

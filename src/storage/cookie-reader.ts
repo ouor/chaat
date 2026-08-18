@@ -31,8 +31,7 @@ export async function readNaverCookiesFromWebView(): Promise<NaverCookies | null
     const aut = cookies['NID_AUT'];
     const ses = cookies['NID_SES'];
     if (aut?.value && ses?.value) return { aut: aut.value, ses: ses.value };
-  } catch (e) {
-    console.log('[login] cookie read failed', e);
+  } catch {
     return null;
   }
   return null;

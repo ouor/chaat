@@ -45,13 +45,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const cookie = `NID_AUT=${cookies.aut}; NID_SES=${cookies.ses}`;
     try {
       const status = await getUserStatus(cookie);
-      console.log('[login] getUserStatus loggedIn=', status?.loggedIn, 'uid=', status?.userIdHash);
       if (!status.loggedIn) return false;
       await saveNaverCookies(cookies);
       setState({ loggedIn: true, cookie, uid: status.userIdHash });
       return true;
-    } catch (e) {
-      console.log('[login] getUserStatus error', e);
+    } catch {
       return false;
     }
   }, []);

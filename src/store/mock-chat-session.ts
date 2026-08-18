@@ -23,8 +23,11 @@ const TEXTS = [
 export interface MockChatSession {
   connState: 'connected';
   liveStatus: 'OPEN';
+  chatChannelId: string | null;
   messages: ChatMessage[];
   notice: string | null;
+  streamingChannelId: string | null;
+  canModerate: boolean;
   sendChat: () => void;
   retry: () => void;
 }
@@ -55,5 +58,15 @@ export function useMockChatSession(enabled: boolean): MockChatSession {
     return () => clearInterval(t);
   }, [enabled]);
 
-  return { connState: 'connected', liveStatus: 'OPEN', messages, notice: null, sendChat: () => undefined, retry: () => undefined };
+  return {
+    connState: 'connected',
+    liveStatus: 'OPEN',
+    chatChannelId: 'mock',
+    messages,
+    notice: null,
+    streamingChannelId: null,
+    canModerate: false,
+    sendChat: () => undefined,
+    retry: () => undefined,
+  };
 }
