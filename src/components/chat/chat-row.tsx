@@ -53,8 +53,9 @@ export const ChatRow = memo(function ChatRow({
   onPress?: () => void;
 }) {
   const theme = useTheme();
-  const { fontScale } = useSettings();
+  const { fontScale, chatVariant } = useSettings();
   const font = CHAT_FONT[fontScale];
+  const isCard = chatVariant === 'card';
   const nickColor = theme[nickKey(m.userIdHash)];
 
   const pressableProps = onPress ? { onPress } : {};
@@ -66,10 +67,18 @@ export const ChatRow = memo(function ChatRow({
   if (m.msgType === 'donation') {
     const amount = m.donationAmount ? `₩${m.donationAmount.toLocaleString()}` : '';
     return (
-      <Pressable {...pressableProps} style={[styles.dono, { backgroundColor: theme.canvasSoft, borderLeftColor: theme.primary }]}>
+      <Pressable
+        {...pressableProps}
+        style={[
+          styles.dono,
+          isCard && styles.donoCard,
+          { backgroundColor: theme.canvasSoft, borderLeftColor: theme.primary, ...(isCard ? { borderColor: theme.primary } : {}) },
+        ]}>
         <View style={styles.donoHead}>
           <Text style={[styles.donoNick, { color: theme.primarySoft }]}>{m.nickname}</Text>
-          {amount ? <Text style={[styles.donoAmount, { color: theme.primarySoft }]}>{amount}</Text> : null}
+          {amount ? (
+            <Text style={[styles.donoAmount, { color: theme.primarySoft, fontSize: isCard ? 17 : 13 }]}>{amount}</Text>
+          ) : null}
         </View>
         <Text style={[styles.donoMsg, { color: theme.ink, fontSize: font }]}>{m.message}</Text>
       </Pressable>
@@ -78,10 +87,30 @@ export const ChatRow = memo(function ChatRow({
 
   if (m.msgType === 'subscription') {
     return (
-      <View style={[styles.sub, { borderColor: theme.hairline }]}>
+      <View style={[styles.sub, isCard && styles.donoCard, { borderColor: theme.hairline }]}>
         <Text style={[styles.subLabel, { color: theme.primarySoft }]}>SUB</Text>
         <Text style={[styles.subText, { color: theme.body, fontSize: font }]}>{m.message}</Text>
       </View>
+    );
+  }
+
+  if (isCard) {
+    return (
+      <Pressable {...pressableProps} style={styles.cardRow}>
+        <View style={[styles.cardAvatar, { backgroundColor: theme.canvasSoft, borderColor: theme.hairline }]}>
+          <Text style={[styles.cardAvatarText, { color: theme.mute }]}>{(m.nickname[0] ?? '?').toUpperCase()}</Text>
+        </View>
+        <View style={styles.cardBody}>
+          <View style={styles.cardNickLine}>
+            <RoleBadge role={m.role} />
+            <Text style={[styles.cardNick, { color: nickColor }]} numberOfLines={1}>
+              {m.nickname}
+            </Text>
+            {showTime ? <Text style={[styles.time, { color: theme.mute }]}>{fmtTime(m.msgTime)}</Text> : null}
+          </View>
+          <Text style={[styles.cardMsg, { color: theme.ink, fontSize: font }]}>{m.message}</Text>
+        </View>
+      </Pressable>
     );
   }
 
@@ -194,4 +223,29 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     flex: 1,
   },
+  donoCard: {
+    borderWidth: 1,
+    marginVertical: 8,
+  },
+  cardRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    paddingVertical: 7,
+    paddingHorizontal: Spacing.lg,
+    alignItems: 'flex-start',
+  },
+  cardAvatar: {
+    width: 26,
+    height: 26,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  cardAvatarText: { fontSize: 10, fontWeight: 600 },
+  cardBody: { flex: 1, minWidth: 0, gap: 3 },
+  cardNickLine: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  cardNick: { fontSize: 13, fontWeight: 600, flexShrink: 1 },
+  cardMsg: { fontSize: 14, lineHeight: 20 },
 });

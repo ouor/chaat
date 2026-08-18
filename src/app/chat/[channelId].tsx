@@ -162,47 +162,49 @@ export default function ChatScreen() {
         </Pressable>
       ) : null}
 
-      <FlatList
-        ref={listRef}
-        inverted
-        data={data}
-        keyExtractor={(item, index) => `${item.userIdHash}:${item.msgTime}:${index}`}
-        renderItem={({ item }) => <ChatRow m={item} showTime={isEnded} onPress={() => setSelected(item)} />}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        style={{ flex: 1, backgroundColor: isEnded ? theme.canvasSoft : theme.canvas }}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            {connState === 'connected' ? (
-              <>
-                <View style={[styles.emptyIcon, { borderColor: theme.hairline }]}>
-                  <Text style={{ color: theme.mute }}>···</Text>
-                </View>
-                <Text style={[styles.emptyTitle, { color: theme.body }]}>No messages yet</Text>
-                <Text style={[styles.emptyHint, { color: theme.mute }]}>
-                  You are first in. New messages appear here as they arrive.
-                </Text>
-              </>
-            ) : (
-              <Text style={{ color: theme.mute }}>{conn.label}…</Text>
-            )}
-          </View>
-        }
-      />
+      <View style={styles.listArea}>
+        <FlatList
+          ref={listRef}
+          inverted
+          data={data}
+          keyExtractor={(item, index) => `${item.userIdHash}:${item.msgTime}:${index}`}
+          renderItem={({ item }) => <ChatRow m={item} showTime={isEnded} onPress={() => setSelected(item)} />}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          style={{ flex: 1, backgroundColor: isEnded ? theme.canvasSoft : theme.canvas }}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              {connState === 'connected' ? (
+                <>
+                  <View style={[styles.emptyIcon, { borderColor: theme.hairline }]}>
+                    <Text style={{ color: theme.mute }}>···</Text>
+                  </View>
+                  <Text style={[styles.emptyTitle, { color: theme.body }]}>No messages yet</Text>
+                  <Text style={[styles.emptyHint, { color: theme.mute }]}>
+                    You are first in. New messages appear here as they arrive.
+                  </Text>
+                </>
+              ) : (
+                <Text style={{ color: theme.mute }}>{conn.label}…</Text>
+              )}
+            </View>
+          }
+        />
 
-      {unread > 0 ? (
-        <View pointerEvents="box-none" style={styles.unreadWrap}>
-          <Pressable
-            onPress={jumpBottom}
-            style={[styles.unreadButton, { backgroundColor: theme.canvasSoft, borderColor: theme.hairline }]}>
-            <Text style={{ color: theme.ink, fontSize: 12, fontWeight: 600 }}>
-              {unread} new {unread === 1 ? 'message' : 'messages'}
-            </Text>
-            <Icon name="down" color={theme.ink} size={10} />
-          </Pressable>
-        </View>
-      ) : null}
+        {unread > 0 ? (
+          <View pointerEvents="box-none" style={styles.unreadWrap}>
+            <Pressable
+              onPress={jumpBottom}
+              style={[styles.unreadButton, { backgroundColor: theme.canvasSoft, borderColor: theme.hairline }]}>
+              <Text style={{ color: theme.ink, fontSize: 12, fontWeight: 600 }}>
+                {unread} new {unread === 1 ? 'message' : 'messages'}
+              </Text>
+              <Icon name="down" color={theme.ink} size={10} />
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
 
       {loggedIn ? (
         <View
@@ -372,7 +374,8 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 13.5 },
   emptyHint: { fontSize: 11.5, lineHeight: 16, textAlign: 'center' },
-  unreadWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  listArea: { flex: 1 },
+  unreadWrap: { position: 'absolute', left: 0, right: 0, bottom: 8, alignItems: 'center' },
   unreadButton: {
     flexDirection: 'row',
     alignItems: 'center',

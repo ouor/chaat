@@ -5,15 +5,23 @@ import { kv } from '@/storage/kv';
 export type ThemeMode = 'dark' | 'light';
 export type FontScale = 'sm' | 'md' | 'lg' | 'xl';
 export type RetentionDays = 7 | 30 | 90 | 0;
+export type ChatVariant = 'compact' | 'card';
 
 export interface Settings {
   theme: ThemeMode;
   fontScale: FontScale;
   retentionDays: RetentionDays;
   autoscroll: boolean;
+  chatVariant: ChatVariant;
 }
 
-const DEFAULTS: Settings = { theme: 'dark', fontScale: 'md', retentionDays: 30, autoscroll: true };
+const DEFAULTS: Settings = {
+  theme: 'dark',
+  fontScale: 'md',
+  retentionDays: 30,
+  autoscroll: true,
+  chatVariant: 'compact',
+};
 const KEY = 'settings';
 
 let cache: Settings | null = null;

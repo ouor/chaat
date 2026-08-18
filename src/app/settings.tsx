@@ -6,7 +6,7 @@ import { Icon } from '@/components/ui/icon';
 import { Radius, Spacing } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
-import { updateSettings, useSettings, type FontScale, type RetentionDays, type ThemeMode } from '@/store/settings';
+import { updateSettings, useSettings, type ChatVariant, type FontScale, type RetentionDays, type ThemeMode } from '@/store/settings';
 import { clearLogs, countLogs, pruneLogs } from '@/storage/log-repo';
 import { useCallback, useState } from 'react';
 
@@ -113,6 +113,16 @@ export default function SettingsScreen() {
               options={['sm', 'md', 'lg', 'xl'].map((k) => ({ label: k.toUpperCase(), value: k as FontScale }))}
               value={settings.fontScale}
               onSelect={(v) => updateSettings({ fontScale: v })}
+            />
+          </Row>
+          <Row label="Chat layout">
+            <Segment<ChatVariant>
+              options={[
+                { label: 'Compact', value: 'compact' },
+                { label: 'Card', value: 'card' },
+              ]}
+              value={settings.chatVariant}
+              onSelect={(v) => updateSettings({ chatVariant: v })}
             />
           </Row>
           <Row label="Auto-scroll to newest">
