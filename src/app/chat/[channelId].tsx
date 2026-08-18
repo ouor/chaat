@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { blindMessage, deleteNotice, postNotice } from '@/client/chzzk/rest';
+import { blindMessage, deleteNotice, getChannel, postNotice } from '@/client/chzzk/rest';
 import type { ChatMessage } from '@/client/chzzk/types';
 import { ChatRow } from '@/components/chat/chat-row';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
@@ -45,6 +45,20 @@ export default function ChatScreen() {
   const [unread, setUnread] = useState(0);
   const [composerOpen, setComposerOpen] = useState(false);
   const [noticeDraft, setNoticeDraft] = useState('');
+  const [channelName, setChannelName] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (isMock) return;
+    getChannel(channelId)
+      .then((c) => {
+        if (!cancelled) setChannelName(c.channelName);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [channelId, isMock]);
 
   const data = useMemo(() => [...messages].reverse(), [messages]);
 
@@ -135,12 +149,14 @@ export default function ChatScreen() {
           <Icon name="back" color={theme.body} />
         </Pressable>
         <View style={[styles.avatar, { borderColor: theme.hairline, backgroundColor: theme.canvasSoft }]}>
-          <Text style={[styles.avatarText, { color: theme.mute }]}>{(channelId[0] ?? '?').toUpperCase()}</Text>
+          <Text style={[styles.avatarText, { color: theme.mute }]}>
+            {((channelName ?? channelId)[0] ?? '?').toUpperCase()}
+          </Text>
         </View>
         <View style={styles.headerTitle}>
           <View style={styles.headerTitleRow}>
             <Text style={[styles.channelName, { color: theme.ink }]} numberOfLines={1}>
-              {channelId}
+              {channelName ?? channelId}
             </Text>
             {isLive ? (
               <View style={[styles.livePill, { backgroundColor: theme.primary }]}>

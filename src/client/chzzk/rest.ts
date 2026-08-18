@@ -1,4 +1,4 @@
-import type { AccessToken, LiveStatus, SearchChannel, UserStatus } from './types';
+import type { AccessToken, ChannelDetail, LiveStatus, SearchChannel, UserStatus } from './types';
 
 const SERVICE_BASE = 'https://api.chzzk.naver.com';
 const GAME_BASE = 'https://comm-api.game.naver.com/nng_main';
@@ -79,6 +79,10 @@ export function getLiveStatus(channelId: string): Promise<LiveStatus> {
     `/polling/v2/channels/${channelId}/live-status`,
     {},
   );
+}
+
+export function getChannel(channelId: string): Promise<ChannelDetail> {
+  return get<{ channel: ChannelDetail }>(SERVICE_BASE, `/service/v1/channels/${channelId}`, {}).then((c) => c.channel);
 }
 
 export function getAccessToken(chatChannelId: string, cookie?: string): Promise<AccessToken> {
