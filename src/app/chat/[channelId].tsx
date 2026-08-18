@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChatRow } from '@/components/chat/chat-row';
@@ -9,13 +9,6 @@ import { Radius, Spacing } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
 import { useChatSession } from '@/store/chat-session';
-
-// ponytail: this device (RN 0.86 new arch) does NOT repaint incrementally added children in
-// foreground — new chat only appeared after a background/foreground redraw. Workaround: key the
-// stream by the latest message so each new message remounts the whole stream (fresh native commit
-// forces a repaint). Scroll-back is still lost (no scroll container). Upgrade path: fix the paint
-// invalidation (dev build / RN version) and restore a virtualized list + batching.
-const VISIBLE = 60;
 
 const CONN_META: Record<string, { label: string; color: 'primarySoft' | 'mute' | 'danger' }> = {
   connecting: { label: 'Connecting…', color: 'mute' },
@@ -34,12 +27,13 @@ export default function ChatScreen() {
 
   const [draft, setDraft] = useState('');
 
+  // Canonical inverted chat list: the array is reversed so index 0 is the newest message,
+  // which renders at the bottom. New messages auto-stick while scrolled to the bottom.
+  const data = useMemo(() => [...messages].reverse(), [messages]);
+
   const conn = CONN_META[connState] ?? CONN_META.connecting;
   const isLive = liveStatus === 'OPEN';
   const isEnded = liveStatus === 'CLOSE';
-  const visible = messages.slice(-VISIBLE);
-  const last = messages[messages.length - 1];
-  const streamKey = last ? `${last.msgTime}:${last.userIdHash}:${messages.length}` : 'empty';
 
   function handleSend() {
     const text = draft.trim();
@@ -92,27 +86,31 @@ export default function ChatScreen() {
         </View>
       ) : null}
 
-      <View key={streamKey} style={[styles.stream, { backgroundColor: isEnded ? theme.canvasSoft : theme.canvas }]}>
-        {messages.length === 0 ? (
-          connState === 'connected' ? (
-            <View style={styles.empty}>
-              <View style={[styles.emptyIcon, { borderColor: theme.hairline }]}>
-                <Text style={{ color: theme.mute }}>···</Text>
-              </View>
-              <Text style={[styles.emptyTitle, { color: theme.body }]}>No messages yet</Text>
-              <Text style={[styles.emptyHint, { color: theme.mute }]}>
-                You are first in. New messages appear here as they arrive.
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.empty}>
+      <FlatList
+        inverted
+        data={data}
+        keyExtractor={(item, index) => `${item.userIdHash}:${item.msgTime}:${index}`}
+        renderItem={({ item }) => <ChatRow m={item} showTime={isEnded} />}
+        style={{ flex: 1, backgroundColor: isEnded ? theme.canvasSoft : theme.canvas }}
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            {connState === 'connected' ? (
+              <>
+                <View style={[styles.emptyIcon, { borderColor: theme.hairline }]}>
+                  <Text style={{ color: theme.mute }}>···</Text>
+                </View>
+                <Text style={[styles.emptyTitle, { color: theme.body }]}>No messages yet</Text>
+                <Text style={[styles.emptyHint, { color: theme.mute }]}>
+                  You are first in. New messages appear here as they arrive.
+                </Text>
+              </>
+            ) : (
               <Text style={{ color: theme.mute }}>{conn.label}…</Text>
-            </View>
-          )
-        ) : (
-          visible.map((m, i) => <ChatRow key={String(i)} m={m} showTime={isEnded} />)
-        )}
-      </View>
+            )}
+          </View>
+        }
+      />
 
       {loggedIn ? (
         <View
@@ -220,8 +218,14 @@ const styles = StyleSheet.create({
   },
   offlineText: { fontSize: 12 },
   offlineRetry: { fontSize: 12, fontWeight: 600 },
-  stream: { flex: 1, justifyContent: 'flex-end', paddingVertical: Spacing.sm },
-  empty: { alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 40, paddingTop: 120 },
+  listContent: { flexGrow: 1 },
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 40,
+  },
   emptyIcon: {
     width: 44,
     height: 44,
