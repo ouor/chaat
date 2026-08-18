@@ -47,21 +47,24 @@ export const ChatRow = memo(function ChatRow({
   m,
   showTime,
   onPress,
+  burst,
 }: {
   m: ChatMessage;
   showTime: boolean;
   onPress?: () => void;
+  burst?: boolean;
 }) {
   const theme = useTheme();
   const { fontScale, chatVariant } = useSettings();
   const font = CHAT_FONT[fontScale];
-  const isCard = chatVariant === 'card';
+  const isCard = chatVariant === 'card' && !burst;
   const nickColor = theme[nickKey(m.userIdHash)];
+  const dim = burst ? 0.78 : 1;
 
   const pressableProps = onPress ? { onPress } : {};
 
   if (m.msgType === 'system') {
-    return <Text style={[styles.system, { color: theme.mute }]}>{m.message}</Text>;
+    return <Text style={[styles.system, { color: theme.mute, opacity: dim }]}>{m.message}</Text>;
   }
 
   if (m.msgType === 'donation') {
@@ -75,12 +78,14 @@ export const ChatRow = memo(function ChatRow({
           { backgroundColor: theme.canvasSoft, borderLeftColor: theme.primary, ...(isCard ? { borderColor: theme.primary } : {}) },
         ]}>
         <View style={styles.donoHead}>
-          <Text style={[styles.donoNick, { color: theme.primarySoft }]}>{m.nickname}</Text>
+          <Text style={[styles.donoNick, { color: theme.primarySoft, opacity: dim }]}>{m.nickname}</Text>
           {amount ? (
             <Text style={[styles.donoAmount, { color: theme.primarySoft, fontSize: isCard ? 17 : 13 }]}>{amount}</Text>
           ) : null}
         </View>
-        <Text style={[styles.donoMsg, { color: theme.ink, fontSize: font }]}>{m.message}</Text>
+        <Text style={[styles.donoMsg, { color: theme.ink, fontSize: font, opacity: dim }]} numberOfLines={burst ? 1 : undefined}>
+          {m.message}
+        </Text>
       </Pressable>
     );
   }
@@ -89,7 +94,7 @@ export const ChatRow = memo(function ChatRow({
     return (
       <View style={[styles.sub, isCard && styles.donoCard, { borderColor: theme.hairline }]}>
         <Text style={[styles.subLabel, { color: theme.primarySoft }]}>SUB</Text>
-        <Text style={[styles.subText, { color: theme.body, fontSize: font }]}>{m.message}</Text>
+        <Text style={[styles.subText, { color: theme.body, fontSize: font, opacity: dim }]}>{m.message}</Text>
       </View>
     );
   }
@@ -117,12 +122,14 @@ export const ChatRow = memo(function ChatRow({
   return (
     <Pressable {...pressableProps} style={styles.chatRow}>
       <View style={styles.chatLine}>
-        <RoleBadge role={m.role} />
+        {!burst ? <RoleBadge role={m.role} /> : null}
         <Text style={[styles.nick, { color: nickColor }]} numberOfLines={1}>
           {m.nickname}
         </Text>
-        <Text style={[styles.message, { color: theme.ink, fontSize: font }]}>{m.message}</Text>
-        {showTime ? <Text style={[styles.time, { color: theme.mute }]}>{fmtTime(m.msgTime)}</Text> : null}
+        <Text style={[styles.message, { color: theme.ink, fontSize: font, opacity: dim }]} numberOfLines={burst ? 1 : undefined}>
+          {m.message}
+        </Text>
+        {showTime && !burst ? <Text style={[styles.time, { color: theme.mute }]}>{fmtTime(m.msgTime)}</Text> : null}
       </View>
     </Pressable>
   );

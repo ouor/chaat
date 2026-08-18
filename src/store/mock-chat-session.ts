@@ -28,6 +28,7 @@ export interface MockChatSession {
   notice: string | null;
   streamingChannelId: string | null;
   canModerate: boolean;
+  burst: boolean;
   sendChat: () => void;
   retry: () => void;
 }
@@ -66,6 +67,7 @@ export function useMockChatSession(enabled: boolean): MockChatSession {
     notice: null,
     streamingChannelId: null,
     canModerate: false,
+    burst: false,
     sendChat: () => undefined,
     retry: () => undefined,
   };

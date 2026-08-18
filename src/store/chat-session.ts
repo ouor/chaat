@@ -15,9 +15,13 @@ export interface ChatSession {
   notice: string | null;
   streamingChannelId: string | null;
   canModerate: boolean;
+  burst: boolean;
   sendChat: (text: string) => void;
   retry: () => void;
 }
+
+const BURST_WINDOW_MS = 3000;
+const BURST_THRESHOLD = 12;
 
 export function useChatSession(
   channelId: string,
@@ -30,8 +34,10 @@ export function useChatSession(
   const [notice, setNotice] = useState<string | null>(null);
   const [streamingChannelId, setStreamingChannelId] = useState<string | null>(null);
   const [canModerate, setCanModerate] = useState(false);
+  const [burst, setBurst] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const socketRef = useRef<ChatSocket | null>(null);
+  const recentTimes = useRef<number[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,6 +62,10 @@ export function useChatSession(
           accessToken: token.accessToken,
           uid: auth.uid,
           onMessage: (m) => {
+            const now = Date.now();
+            recentTimes.current = recentTimes.current.filter((t) => now - t < BURST_WINDOW_MS);
+            recentTimes.current.push(now);
+            setBurst(recentTimes.current.length >= BURST_THRESHOLD);
             if (typeof m.extras.streamingChannelId === 'string') {
               setStreamingChannelId(m.extras.streamingChannelId);
             }
@@ -90,5 +100,5 @@ export function useChatSession(
 
   const retry = useCallback(() => setAttempt((a) => a + 1), []);
 
-  return { connState, liveStatus, chatChannelId, messages, notice, streamingChannelId, canModerate, sendChat, retry };
+  return { connState, liveStatus, chatChannelId, messages, notice, streamingChannelId, canModerate, burst, sendChat, retry };
 }
