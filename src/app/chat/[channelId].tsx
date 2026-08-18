@@ -10,11 +10,11 @@ import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
 import { useChatSession } from '@/store/chat-session';
 
-// ponytail: Expo Go SDK 57 (New Arch) fails to paint ScrollView/FlatList content on this
-// device — everything inside a scroll container renders black while plain Views paint fine.
-// Workaround: render the latest window of messages in a plain View pinned to the bottom
-// (no scroll-back). Upgrade path: verify scroll containers on a dev build and restore a
-// virtualized list once they paint.
+// ponytail: this device (RN 0.86 new arch) does NOT repaint incrementally added children in
+// foreground — new chat only appeared after a background/foreground redraw. Workaround: key the
+// stream by the latest message so each new message remounts the whole stream (fresh native commit
+// forces a repaint). Scroll-back is still lost (no scroll container). Upgrade path: fix the paint
+// invalidation (dev build / RN version) and restore a virtualized list + batching.
 const VISIBLE = 60;
 
 const CONN_META: Record<string, { label: string; color: 'primarySoft' | 'mute' | 'danger' }> = {
@@ -38,6 +38,8 @@ export default function ChatScreen() {
   const isLive = liveStatus === 'OPEN';
   const isEnded = liveStatus === 'CLOSE';
   const visible = messages.slice(-VISIBLE);
+  const last = messages[messages.length - 1];
+  const streamKey = last ? `${last.msgTime}:${last.userIdHash}:${messages.length}` : 'empty';
 
   function handleSend() {
     const text = draft.trim();
@@ -90,7 +92,7 @@ export default function ChatScreen() {
         </View>
       ) : null}
 
-      <View style={[styles.stream, { backgroundColor: isEnded ? theme.canvasSoft : theme.canvas }]}>
+      <View key={streamKey} style={[styles.stream, { backgroundColor: isEnded ? theme.canvasSoft : theme.canvas }]}>
         {messages.length === 0 ? (
           connState === 'connected' ? (
             <View style={styles.empty}>
