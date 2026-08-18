@@ -1,15 +1,21 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { ChatMessage } from '@/client/chzzk/types';
 import { ChatRow } from '@/components/chat/chat-row';
 import { Icon } from '@/components/ui/icon';
 import { Radius, Spacing } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
 import { useChatSession } from '@/store/chat-session';
+
+// ponytail: Expo Go SDK 57 (New Arch) fails to paint ScrollView/FlatList content on this
+// device — everything inside a scroll container renders black while plain Views paint fine.
+// Workaround: render the latest window of messages in a plain View pinned to the bottom
+// (no scroll-back). Upgrade path: verify scroll containers on a dev build and restore a
+// virtualized list once they paint.
+const VISIBLE = 60;
 
 const CONN_META: Record<string, { label: string; color: 'primarySoft' | 'mute' | 'danger' }> = {
   connecting: { label: 'Connecting…', color: 'mute' },
@@ -26,58 +32,18 @@ export default function ChatScreen() {
   const { loggedIn, cookie, uid } = useAuth();
   const { connState, liveStatus, messages, sendChat, retry } = useChatSession(channelId, { cookie, uid });
 
-  // ponytail: FlatList (RN core) instead of FlashList 2 — FlashList 2's native recyclerview +
-  // maintainVisibleContentPosition misrenders in Expo Go (blank rows, forced bottom scroll).
-  // Upgrade to FlashList once a dev build is verified.
-  const listRef = useRef<FlatList<ChatMessage>>(null);
-  const atBottom = useRef(true);
-  const prevCount = useRef(0);
-  const [unread, setUnread] = useState(0);
   const [draft, setDraft] = useState('');
 
   const conn = CONN_META[connState] ?? CONN_META.connecting;
   const isLive = liveStatus === 'OPEN';
   const isEnded = liveStatus === 'CLOSE';
-
-  useEffect(() => {
-    const count = messages.length;
-    if (count === prevCount.current) return;
-    const delta = count - prevCount.current;
-    prevCount.current = count;
-    if (atBottom.current) {
-      const t = setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 0);
-      return () => clearTimeout(t);
-    }
-    setUnread((u) => u + delta);
-  }, [messages.length]);
-
-  function onScroll(e: {
-    nativeEvent: { contentOffset: { y: number }; contentSize: { height: number }; layoutMeasurement: { height: number } };
-  }) {
-    const { y } = e.nativeEvent.contentOffset;
-    const { height: content } = e.nativeEvent.contentSize;
-    const { height: viewport } = e.nativeEvent.layoutMeasurement;
-    const bottom = content - y - viewport < 40;
-    if (bottom !== atBottom.current) {
-      atBottom.current = bottom;
-      if (bottom) setUnread(0);
-    }
-  }
-
-  function jumpBottom() {
-    atBottom.current = true;
-    setUnread(0);
-    listRef.current?.scrollToEnd({ animated: true });
-  }
+  const visible = messages.slice(-VISIBLE);
 
   function handleSend() {
     const text = draft.trim();
     if (!text) return;
     sendChat(text);
     setDraft('');
-    atBottom.current = true;
-    setUnread(0);
-    listRef.current?.scrollToEnd({ animated: true });
   }
 
   return (
@@ -124,15 +90,8 @@ export default function ChatScreen() {
         </View>
       ) : null}
 
-      <FlatList
-        ref={listRef}
-        data={messages}
-        renderItem={({ item }) => <ChatRow m={item} showTime={isEnded} />}
-        keyExtractor={(_, index) => String(index)}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        style={{ flex: 1, backgroundColor: isEnded ? theme.canvasSoft : theme.canvas }}
-        ListEmptyComponent={
+      <View style={[styles.stream, { backgroundColor: isEnded ? theme.canvasSoft : theme.canvas }]}>
+        {messages.length === 0 ? (
           connState === 'connected' ? (
             <View style={styles.empty}>
               <View style={[styles.emptyIcon, { borderColor: theme.hairline }]}>
@@ -148,21 +107,10 @@ export default function ChatScreen() {
               <Text style={{ color: theme.mute }}>{conn.label}…</Text>
             </View>
           )
-        }
-      />
-
-      {unread > 0 ? (
-        <View pointerEvents="box-none" style={styles.unreadWrap}>
-          <Pressable
-            onPress={jumpBottom}
-            style={[styles.unreadButton, { backgroundColor: theme.canvasSoft, borderColor: theme.hairline }]}>
-            <Text style={{ color: theme.ink, fontSize: 12, fontWeight: 600 }}>
-              {unread} new {unread === 1 ? 'message' : 'messages'}
-            </Text>
-            <Icon name="down" color={theme.ink} size={10} />
-          </Pressable>
-        </View>
-      ) : null}
+        ) : (
+          visible.map((m, i) => <ChatRow key={String(i)} m={m} showTime={isEnded} />)
+        )}
+      </View>
 
       {loggedIn ? (
         <View
@@ -270,6 +218,7 @@ const styles = StyleSheet.create({
   },
   offlineText: { fontSize: 12 },
   offlineRetry: { fontSize: 12, fontWeight: 600 },
+  stream: { flex: 1, justifyContent: 'flex-end', paddingVertical: Spacing.sm },
   empty: { alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 40, paddingTop: 120 },
   emptyIcon: {
     width: 44,
@@ -282,16 +231,6 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 13.5 },
   emptyHint: { fontSize: 11.5, lineHeight: 16, textAlign: 'center' },
-  unreadWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  unreadButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    paddingHorizontal: 13,
-    paddingVertical: 7,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
-  },
   inputBar: { borderTopWidth: 1 },
   inputInner: {
     flexDirection: 'row',

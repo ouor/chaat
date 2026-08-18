@@ -1,14 +1,25 @@
 import type { NaverCookies } from './keychain';
 
 // ponytail: NID_AUT/NID_SES are HttpOnly so document.cookie can't see them. Reading the
-// WebView's shared cookie store needs a native module (not in Expo Go). Lazy-require keeps
-// the import safe; Expo Go falls back to manual entry. Upgrade path: none, module is the ceiling.
-type CookieManagerModule = typeof import('@react-native-cookies/cookies');
+// WebView's shared cookie store needs a native module. Lazy-require keeps the import safe;
+// if the module isn't available (Expo Go / new-arch interop missing) this returns null.
+// Upgrade path: a local Expo module if the interop stops working.
 
-let cookieManager: CookieManagerModule | null = null;
+interface CookieValue {
+  name: string;
+  value: string;
+}
+
+// The package ships CJS (`module.exports = { get, ... }`) while its d.ts declares a default
+// export — so type it against the real runtime shape.
+interface CookieManagerLike {
+  get(url: string, useWebKit?: boolean): Promise<Record<string, CookieValue>>;
+}
+
+let cookieManager: CookieManagerLike | null = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy require for Expo Go safety
-  cookieManager = require('@react-native-cookies/cookies');
+  cookieManager = require('@react-native-cookies/cookies') as CookieManagerLike;
 } catch {
   cookieManager = null;
 }
@@ -16,11 +27,12 @@ try {
 export async function readNaverCookiesFromWebView(): Promise<NaverCookies | null> {
   if (!cookieManager) return null;
   try {
-    const cookies = await cookieManager.default.get('https://nid.naver.com');
+    const cookies = await cookieManager.get('https://nid.naver.com');
     const aut = cookies['NID_AUT'];
     const ses = cookies['NID_SES'];
     if (aut?.value && ses?.value) return { aut: aut.value, ses: ses.value };
-  } catch {
+  } catch (e) {
+    console.log('[login] cookie read failed', e);
     return null;
   }
   return null;

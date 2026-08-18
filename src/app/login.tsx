@@ -45,6 +45,7 @@ export default function LoginScreen() {
       if (doneRef.current) return;
       webviewRef.current?.injectJavaScript(POLL_JS);
       void readNaverCookiesFromWebView().then((c) => {
+        console.log('[login] poll cookies=', !!c, 'busy=', busy);
         if (c && !doneRef.current) void tryLogin(c);
       });
     }, 2000);
@@ -56,6 +57,7 @@ export default function LoginScreen() {
     if (busy || doneRef.current) return;
     setBusy(true);
     const ok = await login(cookies);
+    console.log('[login] login() ok=', ok);
     if (ok) {
       doneRef.current = true;
       router.back();
