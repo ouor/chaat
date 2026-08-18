@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { blindMessage } from '@/client/chzzk/rest';
+import { blindMessage, deleteNotice, postNotice } from '@/client/chzzk/rest';
 import type { ChatMessage } from '@/client/chzzk/types';
 import { ChatRow } from '@/components/chat/chat-row';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
@@ -43,6 +43,8 @@ export default function ChatScreen() {
   const [noticeOpen, setNoticeOpen] = useState(true);
   const [selected, setSelected] = useState<ChatMessage | null>(null);
   const [unread, setUnread] = useState(0);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [noticeDraft, setNoticeDraft] = useState('');
 
   const data = useMemo(() => [...messages].reverse(), [messages]);
 
@@ -101,6 +103,31 @@ export default function ChatScreen() {
     }).then(() => setSelected(null));
   }
 
+  function handlePostNotice() {
+    if (!chatChannelId || !cookie || !streamingChannelId || !uid) return;
+    const text = noticeDraft.trim();
+    if (!text) return;
+    void postNotice(chatChannelId, cookie, {
+      message: text,
+      messageTime: Date.now(),
+      messageUserIdHash: uid,
+      streamingChannelId,
+    }).then(() => {
+      setComposerOpen(false);
+      setNoticeDraft('');
+    });
+  }
+
+  function handleClearNotice() {
+    if (!chatChannelId || !cookie || !streamingChannelId || !uid) return;
+    void deleteNotice(chatChannelId, cookie, {
+      message: '',
+      messageTime: Date.now(),
+      messageUserIdHash: uid,
+      streamingChannelId,
+    }).then(() => setComposerOpen(false));
+  }
+
   return (
     <View style={[styles.root, { backgroundColor: theme.canvas }]}>
       <SafeAreaView edges={['top']} style={[styles.header, { borderBottomColor: theme.hairline }]}>
@@ -134,6 +161,14 @@ export default function ChatScreen() {
         <Pressable style={styles.headerButton} hitSlop={8} onPress={() => router.push(`/logs/${channelId}`)}>
           <Icon name="more" color={theme.body} />
         </Pressable>
+        {canModerate && loggedIn ? (
+          <Pressable
+            onPress={() => setComposerOpen(true)}
+            style={[styles.noticePostButton, { borderColor: theme.primarySoft }]}
+            hitSlop={8}>
+            <Text style={[styles.noticePostText, { color: theme.primarySoft }]}>NOTICE</Text>
+          </Pressable>
+        ) : null}
         {burst ? (
           <View style={[styles.burstChip, { backgroundColor: theme.canvasSoft, borderColor: theme.hairline }]}>
             <Text style={[styles.burstChipText, { color: theme.mute }]}>COMPACTED</Text>
@@ -255,6 +290,31 @@ export default function ChatScreen() {
         </View>
       )}
 
+      <BottomSheet visible={composerOpen} onClose={() => setComposerOpen(false)}>
+        <View style={styles.composerBody}>
+          <Text style={[styles.composerLabel, { color: theme.mute }]}>POST NOTICE</Text>
+          <TextInput
+            value={noticeDraft}
+            onChangeText={setNoticeDraft}
+            placeholder="Notice message"
+            placeholderTextColor={theme.mute}
+            multiline
+            style={[
+              styles.composerInput,
+              { backgroundColor: theme.canvasSoft, borderColor: theme.hairline, color: theme.ink },
+            ]}
+          />
+          <View style={styles.composerActions}>
+            <Pressable onPress={handlePostNotice} style={[styles.sheetAction, { backgroundColor: theme.primary }]}>
+              <Text style={[styles.sheetActionText, { color: theme.onPrimary }]}>Post</Text>
+            </Pressable>
+            <Pressable onPress={handleClearNotice} style={[styles.sheetAction, { borderColor: theme.hairline }]}>
+              <Text style={[styles.sheetActionText, { color: theme.danger }]}>Clear</Text>
+            </Pressable>
+          </View>
+        </View>
+      </BottomSheet>
+
       <BottomSheet visible={!!selected} onClose={() => setSelected(null)}>
         {selected ? (
           <View style={styles.sheetBody}>
@@ -345,6 +405,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   burstChipText: { fontSize: 9, fontFamily: 'monospace' },
+  noticePostButton: {
+    borderWidth: 1,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: Radius.xs,
+  },
+  noticePostText: { fontSize: 9, fontWeight: 700, letterSpacing: 0.5 },
+  composerBody: { gap: Spacing.md },
+  composerLabel: { fontSize: 10, fontWeight: 600, letterSpacing: 2.5 },
+  composerInput: {
+    minHeight: 80,
+    borderWidth: 1,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    fontSize: 14,
+    textAlignVertical: 'top',
+  },
+  composerActions: { flexDirection: 'row', gap: Spacing.sm },
   offlineBanner: {
     flexDirection: 'row',
     alignItems: 'center',
