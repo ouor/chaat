@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
@@ -33,11 +33,9 @@ export default function LoginScreen() {
   const theme = useTheme();
   const { login } = useAuth();
 
-  const [phase, setPhase] = useState<'idle' | 'webview' | 'manual' | 'fail'>('idle');
+  const [phase, setPhase] = useState<'idle' | 'webview' | 'fail'>('idle');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [aut, setAut] = useState('');
-  const [ses, setSes] = useState('');
   const webviewRef = useRef<WebView>(null);
   const doneRef = useRef(false);
 
@@ -107,16 +105,13 @@ export default function LoginScreen() {
             style={[styles.cta, { backgroundColor: theme.primary }]}>
             <Text style={[styles.ctaText, { color: theme.onPrimary }]}>Continue with Naver</Text>
           </Pressable>
-          <Pressable onPress={() => setPhase('manual')} hitSlop={8}>
-            <Text style={{ color: theme.mute, fontSize: 12.5 }}>or enter cookies manually</Text>
-          </Pressable>
         </View>
       ) : phase === 'fail' ? (
         <View style={styles.center}>
           <Text style={[styles.failLabel, { color: theme.danger }]}>SIGN-IN FAILED</Text>
           <Text style={[styles.title, { color: theme.ink }]}>Session wasn&apos;t returned</Text>
           <Text style={[styles.hint, { color: theme.mute }]}>
-            The sign-in window closed before we got a token. Try again, or enter cookies manually.
+            The sign-in window closed before we got a token. You can keep reading chat while signed out.
           </Text>
           <View style={styles.failButtons}>
             <Pressable
@@ -128,44 +123,10 @@ export default function LoginScreen() {
               style={[styles.cta, { backgroundColor: theme.primary }]}>
               <Text style={[styles.ctaText, { color: theme.onPrimary }]}>Try again</Text>
             </Pressable>
-            <Pressable onPress={() => setPhase('manual')} style={[styles.outlineButton, { borderColor: theme.hairline }]}>
-              <Text style={{ color: theme.ink, fontSize: 13, fontWeight: 600 }}>Manual</Text>
+            <Pressable onPress={() => router.back()} style={[styles.outlineButton, { borderColor: theme.hairline }]}>
+              <Text style={{ color: theme.ink, fontSize: 13, fontWeight: 600 }}>Read-only</Text>
             </Pressable>
           </View>
-        </View>
-      ) : phase === 'manual' ? (
-        <View style={styles.manualWrap}>
-          <Text style={[styles.manualLabel, { color: theme.mute }]}>NID_AUT</Text>
-          <TextInput
-            value={aut}
-            onChangeText={setAut}
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={[
-              styles.manualInput,
-              { backgroundColor: theme.canvasSoft, borderColor: theme.hairline, color: theme.ink },
-            ]}
-          />
-          <Text style={[styles.manualLabel, { color: theme.mute }]}>NID_SES</Text>
-          <TextInput
-            value={ses}
-            onChangeText={setSes}
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={[
-              styles.manualInput,
-              { backgroundColor: theme.canvasSoft, borderColor: theme.hairline, color: theme.ink },
-            ]}
-          />
-          <Pressable
-            onPress={() => void tryLogin({ aut: aut.trim(), ses: ses.trim() })}
-            disabled={busy || !aut.trim() || !ses.trim()}
-            style={[styles.cta, { backgroundColor: theme.primary, opacity: busy || !aut.trim() || !ses.trim() ? 0.5 : 1 }]}>
-            <Text style={[styles.ctaText, { color: theme.onPrimary }]}>{busy ? 'Signing in…' : 'Sign in'}</Text>
-          </Pressable>
-          <Pressable onPress={() => setPhase('idle')} hitSlop={8}>
-            <Text style={{ color: theme.mute, fontSize: 12.5 }}>back</Text>
-          </Pressable>
         </View>
       ) : (
         <View style={styles.webviewWrap}>
@@ -230,16 +191,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
     borderWidth: 1,
     justifyContent: 'center',
-  },
-  manualWrap: { padding: Spacing.xl, gap: Spacing.sm },
-  manualLabel: { fontSize: 11, fontFamily: 'monospace', fontWeight: 600 },
-  manualInput: {
-    height: 40,
-    borderWidth: 1,
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.md,
-    fontSize: 13,
-    fontFamily: 'monospace',
   },
   webviewWrap: { flex: 1 },
   webview: { flex: 1 },
