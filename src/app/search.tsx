@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { searchChannels, type SearchResult } from '@/client/chzzk/rest';
 import type { SearchChannel } from '@/client/chzzk/types';
+import { ChannelAvatar } from '@/components/channel/channel-avatar';
 import { Icon } from '@/components/ui/icon';
 import { Radius, Spacing } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
@@ -116,10 +117,8 @@ export default function SearchScreen() {
                   }}
                   style={styles.rowMain}
                   hitSlop={4}>
-                  <View style={[styles.avatar, { borderColor: theme.hairline, backgroundColor: theme.canvasSoft }]}>
-                    <Text style={[styles.avatarText, { color: theme.mute }]}>
-                      {(ch.channelName[0] ?? '?').toUpperCase()}
-                    </Text>
+                  <View style={styles.avatar}>
+                    <ChannelAvatar uri={ch.channelImageUrl} name={ch.channelName} size={40} />
                   </View>
                   <View style={styles.rowText}>
                     <View style={styles.rowTitle}>
@@ -222,12 +221,7 @@ const styles = StyleSheet.create({
   avatar: {
     width: 40,
     height: 40,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  avatarText: { fontSize: 14, fontWeight: 600 },
   rowText: { flex: 1, minWidth: 0, gap: 3 },
   rowTitle: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   rowName: { fontSize: 14.5, fontWeight: 600, flexShrink: 1 },

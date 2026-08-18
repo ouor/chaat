@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getLiveStatus } from '@/client/chzzk/rest';
+import { ChannelAvatar } from '@/components/channel/channel-avatar';
 import { Icon } from '@/components/ui/icon';
 import { Radius, Spacing } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
@@ -93,10 +94,8 @@ export default function HomeScreen() {
               <Pressable
                 onPress={() => router.push(`/chat/${item.channelId}`)}
                 style={[styles.row, { borderBottomColor: theme.hairline }]}>
-                <View style={[styles.avatar, { borderColor: theme.hairline, backgroundColor: theme.canvasSoft }]}>
-                  <Text style={[styles.avatarText, { color: theme.mute }]}>
-                    {(item.channelName[0] ?? '?').toUpperCase()}
-                  </Text>
+                <View style={styles.avatar}>
+                  <ChannelAvatar uri={item.channelImageUrl} name={item.channelName} size={44} />
                 </View>
                 <View style={styles.rowText}>
                   <View style={styles.rowTitle}>
@@ -167,12 +166,7 @@ const styles = StyleSheet.create({
   avatar: {
     width: 44,
     height: 44,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  avatarText: { fontSize: 15, fontWeight: 600 },
   rowText: { flex: 1, minWidth: 0, gap: 4 },
   rowTitle: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   rowName: { fontSize: 15, fontWeight: 600, flexShrink: 1 },

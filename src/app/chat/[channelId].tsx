@@ -7,6 +7,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { blindMessage, deleteNotice, getChannel, getProfileCard, postNotice, type ProfileCard } from '@/client/chzzk/rest';
 import type { ChatMessage } from '@/client/chzzk/types';
 import { ChatRow } from '@/components/chat/chat-row';
+import { ChannelAvatar } from '@/components/channel/channel-avatar';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { Icon } from '@/components/ui/icon';
 import { Radius, Spacing } from '@/constants/tokens';
@@ -48,6 +49,7 @@ export default function ChatScreen() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [noticeDraft, setNoticeDraft] = useState('');
   const [channelName, setChannelName] = useState<string | null>(null);
+  const [channelImage, setChannelImage] = useState<string | null>(null);
   const [profileCard, setProfileCard] = useState<ProfileCard | null>(null);
 
   useEffect(() => {
@@ -68,7 +70,10 @@ export default function ChatScreen() {
     if (isMock) return;
     getChannel(channelId)
       .then((c) => {
-        if (!cancelled) setChannelName(c.channelName);
+        if (!cancelled) {
+          setChannelName(c.channelName);
+          setChannelImage(c.channelImageUrl);
+        }
       })
       .catch(() => undefined);
     return () => {
@@ -164,10 +169,8 @@ export default function ChatScreen() {
         <Pressable onPress={() => router.back()} style={styles.headerButton} hitSlop={8}>
           <Icon name="back" color={theme.body} />
         </Pressable>
-        <View style={[styles.avatar, { borderColor: theme.hairline, backgroundColor: theme.canvasSoft }]}>
-          <Text style={[styles.avatarText, { color: theme.mute }]}>
-            {((channelName ?? channelId)[0] ?? '?').toUpperCase()}
-          </Text>
+        <View style={styles.avatar}>
+          <ChannelAvatar uri={channelImage} name={channelName ?? channelId} size={30} />
         </View>
         <View style={styles.headerTitle}>
           <View style={styles.headerTitleRow}>
@@ -407,12 +410,7 @@ const styles = StyleSheet.create({
   avatar: {
     width: 30,
     height: 30,
-    borderRadius: Radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
   },
-  avatarText: { fontSize: 12, fontWeight: 600 },
   headerTitle: { flex: 1, minWidth: 0, gap: 2 },
   headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   channelName: { fontSize: 15, fontWeight: 600, flexShrink: 1 },
