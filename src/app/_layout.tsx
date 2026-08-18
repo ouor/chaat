@@ -1,13 +1,12 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { useEffect } from 'react';
-import { useColorScheme } from 'react-native';
 
 import { AuthProvider } from '@/store/auth-context';
-import { getSettings } from '@/store/settings';
+import { getSettings, useSettings } from '@/store/settings';
 import { pruneLogs } from '@/storage/log-repo';
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const { theme } = useSettings();
 
   useEffect(() => {
     const { retentionDays } = getSettings();
@@ -15,7 +14,7 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={theme === 'dark' ? DarkTheme : DefaultTheme}>
       <AuthProvider>
         <Stack screenOptions={{ headerShown: false }} />
       </AuthProvider>

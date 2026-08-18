@@ -10,6 +10,8 @@ import { updateSettings, useSettings, type ChatVariant, type FontScale, type Ret
 import { clearLogs, countLogs, pruneLogs } from '@/storage/log-repo';
 import { useCallback, useState } from 'react';
 
+const FONT_PREVIEW: Record<FontScale, number> = { sm: 13, md: 14, lg: 16, xl: 18 };
+
 function Segment<T extends string | number>({
   options,
   value,
@@ -125,6 +127,12 @@ export default function SettingsScreen() {
               onSelect={(v) => updateSettings({ chatVariant: v })}
             />
           </Row>
+          <View style={[styles.preview, { borderColor: theme.hairline, backgroundColor: theme.canvasSoft }]}>
+            <Text style={{ color: theme.primarySoft, fontSize: 12.5, fontWeight: 600 }}>preview</Text>
+            <Text style={{ color: theme.ink, fontSize: FONT_PREVIEW[settings.fontScale], lineHeight: 22 }}>
+              this is how chat will read at a glance
+            </Text>
+          </View>
           <Row label="Auto-scroll to newest">
             <Pressable onPress={() => updateSettings({ autoscroll: !settings.autoscroll })}>
               <View
@@ -229,6 +237,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   segmentText: { fontSize: 12.5, fontWeight: 600, fontFamily: 'monospace' },
+  preview: {
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    gap: Spacing.xs,
+  },
   switch: {
     width: 44,
     height: 26,
