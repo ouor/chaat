@@ -1,6 +1,6 @@
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -16,29 +16,30 @@ export default function HomeScreen() {
   const { favorites } = useFavorites();
   const [liveMap, setLiveMap] = useState<Record<string, { open: boolean; viewers: number }>>({});
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadStatuses = useCallback(() => {
+    Promise.allSettled(favorites.map((f) => getLiveStatus(f.channelId))).then((results) => {
+      const map: Record<string, { open: boolean; viewers: number }> = {};
+      favorites.forEach((f, i) => {
+        const r = results[i];
+        if (r.status === 'fulfilled') {
+          map[f.channelId] = { open: r.value.status === 'OPEN', viewers: r.value.concurrentUserCount };
+        }
+      });
+      setLiveMap(map);
+      setLoading(false);
+      setRefreshing(false);
+    });
+  }, [favorites]);
 
   useEffect(() => {
-    let cancelled = false;
     const t = setTimeout(() => {
       setLoading(true);
-      Promise.allSettled(favorites.map((f) => getLiveStatus(f.channelId))).then((results) => {
-        if (cancelled) return;
-        const map: Record<string, { open: boolean; viewers: number }> = {};
-        favorites.forEach((f, i) => {
-          const r = results[i];
-          if (r.status === 'fulfilled') {
-            map[f.channelId] = { open: r.value.status === 'OPEN', viewers: r.value.concurrentUserCount };
-          }
-        });
-        setLiveMap(map);
-        setLoading(false);
-      });
+      loadStatuses();
     }, 0);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [favorites]);
+    return () => clearTimeout(t);
+  }, [loadStatuses]);
 
   const favoritesCount = favorites.length;
 
@@ -73,6 +74,11 @@ export default function HomeScreen() {
       ) : (
         <FlashList
           data={favorites}
+          onRefresh={() => {
+            setRefreshing(true);
+            loadStatuses();
+          }}
+          refreshing={refreshing}
           renderItem={({ item }: { item: FavoriteChannel }) => {
             const live = liveMap[item.channelId];
             const isOpen = live?.open ?? false;
