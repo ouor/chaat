@@ -9,6 +9,7 @@ import { Radius, Spacing } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
 import { useChatSession } from '@/store/chat-session';
+import { useMockChatSession } from '@/store/mock-chat-session';
 
 const CONN_META: Record<string, { label: string; color: 'primarySoft' | 'mute' | 'danger' }> = {
   connecting: { label: 'Connecting…', color: 'mute' },
@@ -23,7 +24,10 @@ export default function ChatScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { loggedIn, cookie, uid } = useAuth();
-  const { connState, liveStatus, messages, sendChat, retry } = useChatSession(channelId, { cookie, uid });
+  const isMock = channelId === 'mock';
+  const real = useChatSession(channelId, { cookie, uid });
+  const mock = useMockChatSession(isMock);
+  const { connState, liveStatus, messages, sendChat, retry } = isMock ? mock : real;
 
   const [draft, setDraft] = useState('');
 
