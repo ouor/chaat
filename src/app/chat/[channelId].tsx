@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { blindMessage, deleteNotice, getChannel, postNotice } from '@/client/chzzk/rest';
+import { blindMessage, deleteNotice, getChannel, getProfileCard, postNotice, type ProfileCard } from '@/client/chzzk/rest';
 import type { ChatMessage } from '@/client/chzzk/types';
 import { ChatRow } from '@/components/chat/chat-row';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
@@ -48,6 +48,20 @@ export default function ChatScreen() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [noticeDraft, setNoticeDraft] = useState('');
   const [channelName, setChannelName] = useState<string | null>(null);
+  const [profileCard, setProfileCard] = useState<ProfileCard | null>(null);
+
+  useEffect(() => {
+    if (!selected || !chatChannelId) return;
+    let cancelled = false;
+    getProfileCard(chatChannelId, selected.userIdHash, cookie)
+      .then((c) => {
+        if (!cancelled) setProfileCard(c);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [selected, chatChannelId, cookie]);
 
   useEffect(() => {
     let cancelled = false;
@@ -333,7 +347,7 @@ export default function ChatScreen() {
         </View>
       </BottomSheet>
 
-      <BottomSheet visible={!!selected} onClose={() => setSelected(null)}>
+      <BottomSheet visible={!!selected} onClose={() => { setSelected(null); setProfileCard(null); }}>
         {selected ? (
           <View style={styles.sheetBody}>
             <View style={styles.sheetHead}>
@@ -344,7 +358,13 @@ export default function ChatScreen() {
               </View>
               <View style={styles.sheetTitle}>
                 <Text style={[styles.sheetNick, { color: theme.ink }]}>{selected.nickname}</Text>
-                <Text style={[styles.sheetMeta, { color: theme.mute }]}>{ROLE_LABEL[selected.role]}</Text>
+                <Text style={[styles.sheetMeta, { color: theme.mute }]}>
+                  {profileCard?.streamingProperty.subscription
+                    ? `구독 ${profileCard.streamingProperty.subscription.accumulativeMonth}개월`
+                    : profileCard?.streamingProperty.following
+                      ? '팔로우 중'
+                      : ROLE_LABEL[selected.role]}
+                </Text>
               </View>
             </View>
             <View style={[styles.sheetMsg, { borderColor: theme.hairline, backgroundColor: theme.canvasSoft }]}>

@@ -130,10 +130,15 @@ export async function blindMessage(chatChannelId: string, cookie: string, p: Not
 export interface ProfileCard {
   userIdHash: string;
   nickname: string;
-  profileImageUrl: string;
+  profileImageUrl: string | null;
+  userRoleCode: string;
   verifiedMark: boolean;
-  chatRestrict: boolean;
-  chatRestrictReason: string | null;
+  activityBadges: { badgeId: string; title: string; description: string; activated: boolean }[];
+  streamingProperty: {
+    subscription?: { accumulativeMonth: number; tierName: string };
+    following?: { followDate: string };
+    nicknameColor?: { colorCode: string };
+  };
 }
 
 export function getProfileCard(chatChannelId: string, userIdHash: string, cookie?: string): Promise<ProfileCard> {
