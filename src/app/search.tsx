@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,6 +9,7 @@ import { Icon } from '@/components/ui/icon';
 import { Radius, Spacing } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { toggleFavorite, useFavorites } from '@/store/favorites';
+import { addRecentSearch, getRecentSearches } from '@/store/recents';
 
 const PAGE_SIZE = 20;
 
@@ -27,9 +28,16 @@ export default function SearchScreen() {
   const [nextOffset, setNextOffset] = useState<number | null>(null);
   const [initialLoading, setInitialLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [recents, setRecents] = useState<string[]>([]);
   const listRef = useRef<FlatList<SearchChannel>>(null);
 
   const query = q.trim();
+
+  useFocusEffect(
+    useCallback(() => {
+      setRecents(getRecentSearches());
+    }, []),
+  );
 
   useEffect(() => {
     if (!query) {
@@ -102,7 +110,10 @@ export default function SearchScreen() {
             return (
               <View style={[styles.row, { borderBottomColor: theme.hairline }]}>
                 <Pressable
-                  onPress={() => router.push(`/chat/${ch.channelId}`)}
+                  onPress={() => {
+                    if (query) setRecents(addRecentSearch(query));
+                    router.push(`/chat/${ch.channelId}`);
+                  }}
                   style={styles.rowMain}
                   hitSlop={4}>
                   <View style={[styles.avatar, { borderColor: theme.hairline, backgroundColor: theme.canvasSoft }]}>
@@ -159,8 +170,21 @@ export default function SearchScreen() {
           }
         />
       ) : (
-        <View style={[styles.empty, { backgroundColor: theme.canvas }]}>
-          <Text style={{ color: theme.mute }}>Type a channel name to search</Text>
+        <View style={[styles.empty, { backgroundColor: theme.canvas, alignItems: 'flex-start' }]}>
+          {recents.length > 0 ? (
+            <>
+              <Text style={[styles.recentLabel, { color: theme.mute }]}>RECENT</Text>
+              <View style={styles.recentWrap}>
+                {recents.map((r) => (
+                  <Pressable key={r} onPress={() => setQ(r)} style={[styles.recentChip, { borderColor: theme.hairline }]}>
+                    <Text style={{ color: theme.ink, fontSize: 13 }}>{r}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          ) : (
+            <Text style={{ color: theme.mute }}>Type a channel name to search</Text>
+          )}
         </View>
       )}
     </View>
@@ -218,4 +242,12 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 40, paddingTop: 100 },
   emptyTitle: { fontSize: 14.5, fontWeight: 600 },
   emptyHint: { fontSize: 12.5, lineHeight: 18, textAlign: 'center' },
+  recentLabel: { fontSize: 11, fontWeight: 600, letterSpacing: 2.5 },
+  recentWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  recentChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+  },
 });
