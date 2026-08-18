@@ -1,4 +1,5 @@
 import type { ChatMessage, ChatRole, MsgType } from './types';
+import { splitEmoji } from './emoji';
 
 export const Cmd = {
   PING: 0,
@@ -325,4 +326,9 @@ export function selfCheck(): void {
   assert(pongMessage().cmd === Cmd.PONG, 'pong encode');
   const rec = recentChatMessage('abc', 'sid1');
   assert(rec.cmd === Cmd.REQUEST_RECENT_CHAT && rec.sid === 'sid1' && rec.bdy.recentMessageCount === 50, 'recent encode');
+
+  const seg = splitEmoji('hi {:d_1:} bye {:unknown:}', { d_1: 'https://x/1.png' });
+  assert(seg.length === 4, 'emoji split count');
+  assert(seg[1].emojiId === 'd_1' && seg[1].imageUrl === 'https://x/1.png', 'emoji image lookup');
+  assert(seg[3].text === '{:unknown:}', 'unknown emoji kept as text');
 }

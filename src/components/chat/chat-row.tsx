@@ -5,6 +5,7 @@ import type { ChatMessage } from '@/client/chzzk/types';
 import { Radius, Spacing } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { useSettings, type FontScale } from '@/store/settings';
+import { EmojiText } from '@/components/chat/emoji-text';
 
 const CHAT_FONT: Record<FontScale, number> = { sm: 13, md: 14, lg: 16, xl: 18 };
 
@@ -47,24 +48,24 @@ export const ChatRow = memo(function ChatRow({
   m,
   showTime,
   onPress,
-  burst,
+  emojiMap,
 }: {
   m: ChatMessage;
   showTime: boolean;
   onPress?: () => void;
-  burst?: boolean;
+  emojiMap?: Record<string, string>;
 }) {
   const theme = useTheme();
   const { fontScale, chatVariant } = useSettings();
   const font = CHAT_FONT[fontScale];
-  const isCard = chatVariant === 'card' && !burst;
+  const isCard = chatVariant === 'card';
   const nickColor = theme[nickKey(m.userIdHash)];
-  const dim = burst ? 0.78 : 1;
+  const emojis = emojiMap ?? {};
 
   const pressableProps = onPress ? { onPress } : {};
 
   if (m.msgType === 'system') {
-    return <Text style={[styles.system, { color: theme.mute, opacity: dim }]}>{m.message}</Text>;
+    return <Text style={[styles.system, { color: theme.mute }]}>{m.message}</Text>;
   }
 
   if (m.msgType === 'donation') {
@@ -78,14 +79,12 @@ export const ChatRow = memo(function ChatRow({
           { backgroundColor: theme.canvasSoft, borderLeftColor: theme.primary, ...(isCard ? { borderColor: theme.primary } : {}) },
         ]}>
         <View style={styles.donoHead}>
-          <Text style={[styles.donoNick, { color: theme.primarySoft, opacity: dim }]}>{m.nickname}</Text>
+          <Text style={[styles.donoNick, { color: theme.primarySoft }]}>{m.nickname}</Text>
           {amount ? (
             <Text style={[styles.donoAmount, { color: theme.primarySoft, fontSize: isCard ? 17 : 13 }]}>{amount}</Text>
           ) : null}
         </View>
-        <Text style={[styles.donoMsg, { color: theme.ink, fontSize: font, opacity: dim }]} numberOfLines={burst ? 1 : undefined}>
-          {m.message}
-        </Text>
+        <EmojiText text={m.message} emojiMap={emojis} fontSize={font} color={theme.ink} />
       </Pressable>
     );
   }
@@ -94,7 +93,7 @@ export const ChatRow = memo(function ChatRow({
     return (
       <View style={[styles.sub, isCard && styles.donoCard, { borderColor: theme.hairline }]}>
         <Text style={[styles.subLabel, { color: theme.primarySoft }]}>SUB</Text>
-        <Text style={[styles.subText, { color: theme.body, fontSize: font, opacity: dim }]}>{m.message}</Text>
+        <Text style={[styles.subText, { color: theme.body, fontSize: font }]}>{m.message}</Text>
       </View>
     );
   }
@@ -113,7 +112,7 @@ export const ChatRow = memo(function ChatRow({
             </Text>
             {showTime ? <Text style={[styles.time, { color: theme.mute }]}>{fmtTime(m.msgTime)}</Text> : null}
           </View>
-          <Text style={[styles.cardMsg, { color: theme.ink, fontSize: font }]}>{m.message}</Text>
+          <EmojiText text={m.message} emojiMap={emojis} fontSize={font} color={theme.ink} />
         </View>
       </Pressable>
     );
@@ -122,14 +121,12 @@ export const ChatRow = memo(function ChatRow({
   return (
     <Pressable {...pressableProps} style={styles.chatRow}>
       <View style={styles.chatLine}>
-        {!burst ? <RoleBadge role={m.role} /> : null}
+        <RoleBadge role={m.role} />
         <Text style={[styles.nick, { color: nickColor }]} numberOfLines={1}>
           {m.nickname}
         </Text>
-        <Text style={[styles.message, { color: theme.ink, fontSize: font, opacity: dim }]} numberOfLines={burst ? 1 : undefined}>
-          {m.message}
-        </Text>
-        {showTime && !burst ? <Text style={[styles.time, { color: theme.mute }]}>{fmtTime(m.msgTime)}</Text> : null}
+        <EmojiText text={m.message} emojiMap={emojis} fontSize={font} color={theme.ink} />
+        {showTime ? <Text style={[styles.time, { color: theme.mute }]}>{fmtTime(m.msgTime)}</Text> : null}
       </View>
     </Pressable>
   );
@@ -150,11 +147,6 @@ const styles = StyleSheet.create({
     fontWeight: 600,
     flexShrink: 0,
     maxWidth: '40%',
-  },
-  message: {
-    flex: 1,
-    fontSize: 14,
-    lineHeight: 20,
   },
   time: {
     fontSize: 9,
@@ -203,10 +195,6 @@ const styles = StyleSheet.create({
     fontWeight: 700,
     fontFamily: 'monospace',
   },
-  donoMsg: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
   sub: {
     borderWidth: 1,
     borderStyle: 'dashed',
@@ -254,5 +242,4 @@ const styles = StyleSheet.create({
   cardBody: { flex: 1, minWidth: 0, gap: 3 },
   cardNickLine: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   cardNick: { fontSize: 13, fontWeight: 600, flexShrink: 1 },
-  cardMsg: { fontSize: 14, lineHeight: 20 },
 });

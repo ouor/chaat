@@ -39,7 +39,7 @@ export default function ChatScreen() {
   const isMock = channelId === 'mock';
   const real = useChatSession(channelId, { cookie, uid });
   const mock = useMockChatSession(isMock);
-  const { connState, liveStatus, messages, notice, chatChannelId, streamingChannelId, canModerate, burst, sendChat, retry } =
+  const { connState, liveStatus, messages, notice, chatChannelId, streamingChannelId, canModerate, emojiMap, sendChat, retry } =
     isMock ? mock : real;
 
   const [draft, setDraft] = useState('');
@@ -204,11 +204,6 @@ export default function ChatScreen() {
             <Text style={[styles.noticePostText, { color: theme.primarySoft }]}>NOTICE</Text>
           </Pressable>
         ) : null}
-        {burst ? (
-          <View style={[styles.burstChip, { backgroundColor: theme.canvasSoft, borderColor: theme.hairline }]}>
-            <Text style={[styles.burstChipText, { color: theme.mute }]}>COMPACTED</Text>
-          </View>
-        ) : null}
       </SafeAreaView>
 
       {connState === 'offline' ? (
@@ -243,7 +238,9 @@ export default function ChatScreen() {
           inverted
           data={data}
           keyExtractor={(item, index) => `${item.userIdHash}:${item.msgTime}:${index}`}
-          renderItem={({ item }) => <ChatRow m={item} showTime={isEnded} burst={burst} onPress={() => setSelected(item)} />}
+          renderItem={({ item }) => (
+            <ChatRow m={item} showTime={isEnded} emojiMap={emojiMap} onPress={() => setSelected(item)} />
+          )}
           onScroll={onScroll}
           scrollEventThrottle={16}
           style={{ flex: 1, backgroundColor: isEnded ? theme.canvasSoft : theme.canvas }}
@@ -434,13 +431,6 @@ const styles = StyleSheet.create({
   connRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   connDot: { width: 5, height: 5, borderRadius: Radius.pill },
   connLabel: { fontSize: 11 },
-  burstChip: {
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: Radius.xs,
-    borderWidth: 1,
-  },
-  burstChipText: { fontSize: 9, fontFamily: 'monospace' },
   noticePostButton: {
     borderWidth: 1,
     paddingHorizontal: 7,

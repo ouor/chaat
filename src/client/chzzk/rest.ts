@@ -149,3 +149,15 @@ export function getProfileCard(chatChannelId: string, userIdHash: string, cookie
     cookie,
   );
 }
+
+export interface EmojiPack {
+  emojiPackId: string;
+  emojiPackName: string;
+  emojis: { emojiId: string; imageUrl: string }[];
+}
+
+export function getEmojiPacks(channelId: string): Promise<{ emojiId: string; imageUrl: string }[]> {
+  return get<{ emojiPacks: EmojiPack[] }>(SERVICE_BASE, `/service/v1/channels/${channelId}/emoji-packs`, {}).then(
+    (c) => c.emojiPacks.flatMap((p) => p.emojis),
+  );
+}
