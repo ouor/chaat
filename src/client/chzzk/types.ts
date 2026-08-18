@@ -48,6 +48,7 @@ export interface ChatMessage {
   chatChannelId: string;
   userIdHash: string;
   nickname: string;
+  profileImageUrl?: string;
   message: string;
   msgType: MsgType;
   role: ChatRole;

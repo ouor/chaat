@@ -1,4 +1,5 @@
-import { memo } from 'react';
+import { Image } from 'expo-image';
+import { memo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { ChatMessage } from '@/client/chzzk/types';
@@ -42,6 +43,33 @@ function RoleBadge({ role }: { role: ChatMessage['role'] }) {
     );
   }
   return null;
+}
+
+export function ProfileThumb({ uri, name, size }: { uri?: string; name: string; size: number }) {
+  const theme = useTheme();
+  const [failed, setFailed] = useState(false);
+
+  if (failed || !uri) {
+    return (
+      <View
+        style={[
+          styles.thumbInitial,
+          { width: size, height: size, borderRadius: Radius.pill, backgroundColor: theme.canvasSoft, borderColor: theme.hairline },
+        ]}>
+        <Text style={[styles.thumbText, { color: theme.mute, fontSize: Math.max(9, size * 0.4) }]}>
+          {(name[0] ?? '?').toUpperCase()}
+        </Text>
+      </View>
+    );
+  }
+  return (
+    <Image
+      source={{ uri }}
+      style={{ width: size, height: size, borderRadius: Radius.pill, backgroundColor: theme.canvasSoft }}
+      contentFit="cover"
+      onError={() => setFailed(true)}
+    />
+  );
 }
 
 export const ChatRow = memo(function ChatRow({
@@ -101,9 +129,7 @@ export const ChatRow = memo(function ChatRow({
   if (isCard) {
     return (
       <Pressable {...pressableProps} style={styles.cardRow}>
-        <View style={[styles.cardAvatar, { backgroundColor: theme.canvasSoft, borderColor: theme.hairline }]}>
-          <Text style={[styles.cardAvatarText, { color: theme.mute }]}>{(m.nickname[0] ?? '?').toUpperCase()}</Text>
-        </View>
+        <ProfileThumb uri={m.profileImageUrl} name={m.nickname} size={26} />
         <View style={styles.cardBody}>
           <View style={styles.cardNickLine}>
             <RoleBadge role={m.role} />
@@ -121,6 +147,7 @@ export const ChatRow = memo(function ChatRow({
   return (
     <Pressable {...pressableProps} style={styles.chatRow}>
       <View style={styles.chatLine}>
+        <ProfileThumb uri={m.profileImageUrl} name={m.nickname} size={18} />
         <RoleBadge role={m.role} />
         <Text style={[styles.nick, { color: nickColor }]} numberOfLines={1}>
           {m.nickname}
@@ -139,8 +166,17 @@ const styles = StyleSheet.create({
   },
   chatLine: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'flex-start',
     gap: Spacing.xs,
+  },
+  thumbInitial: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    flexShrink: 0,
+  },
+  thumbText: {
+    fontWeight: 600,
   },
   nick: {
     fontSize: 13,
@@ -229,16 +265,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     alignItems: 'flex-start',
   },
-  cardAvatar: {
-    width: 26,
-    height: 26,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 1,
-  },
-  cardAvatarText: { fontSize: 10, fontWeight: 600 },
   cardBody: { flex: 1, minWidth: 0, gap: 3 },
   cardNickLine: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   cardNick: { fontSize: 13, fontWeight: 600, flexShrink: 1 },

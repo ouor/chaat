@@ -6,7 +6,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { blindMessage, deleteNotice, getChannel, getProfileCard, postNotice, type ProfileCard } from '@/client/chzzk/rest';
 import type { ChatMessage } from '@/client/chzzk/types';
-import { ChatRow } from '@/components/chat/chat-row';
+import { ChatRow, ProfileThumb } from '@/components/chat/chat-row';
 import { ChannelAvatar } from '@/components/channel/channel-avatar';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { Icon } from '@/components/ui/icon';
@@ -351,11 +351,7 @@ export default function ChatScreen() {
         {selected ? (
           <View style={styles.sheetBody}>
             <View style={styles.sheetHead}>
-              <View style={[styles.sheetAvatar, { backgroundColor: theme.canvasSoft, borderColor: theme.hairline }]}>
-                <Text style={[styles.sheetAvatarText, { color: theme.mute }]}>
-                  {(selected.nickname[0] ?? '?').toUpperCase()}
-                </Text>
-              </View>
+              <ProfileThumb uri={selected.profileImageUrl} name={selected.nickname} size={48} />
               <View style={styles.sheetTitle}>
                 <Text style={[styles.sheetNick, { color: theme.ink }]}>{selected.nickname}</Text>
                 <Text style={[styles.sheetMeta, { color: theme.mute }]}>
@@ -537,15 +533,6 @@ const styles = StyleSheet.create({
   signInText: { fontSize: 13, fontWeight: 600 },
   sheetBody: { gap: Spacing.lg },
   sheetHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
-  sheetAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sheetAvatarText: { fontSize: 17, fontWeight: 600 },
   sheetTitle: { flex: 1, gap: 4 },
   sheetNick: { fontSize: 16, fontWeight: 600 },
   sheetMeta: { fontSize: 10.5, fontFamily: 'monospace' },

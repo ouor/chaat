@@ -170,6 +170,7 @@ function messageFromBdy(raw: Record<string, unknown>, chatChannelId: string): Ch
     chatChannelId,
     userIdHash,
     nickname,
+    profileImageUrl: typeof profile.profileImageUrl === 'string' ? profile.profileImageUrl : undefined,
     message: String(bdy.msg ?? bdy.content ?? bdy.noticeMessage ?? ''),
     msgType,
     role,
