@@ -27,14 +27,24 @@ async function get<T>(
   params: Record<string, string | number>,
   cookie?: string,
 ): Promise<T> {
-  const res = await fetch(base + path + qs(params), {
+  return request<T>(base, path, { params, cookie });
+}
+
+async function request<T>(
+  base: string,
+  path: string,
+  opts: { params?: Record<string, string | number>; cookie?: string; method?: 'GET' | 'POST' | 'DELETE' | 'PUT'; body?: unknown } = {},
+): Promise<T> {
+  const res = await fetch(base + path + qs(opts.params ?? {}), {
+    method: opts.method ?? 'GET',
     headers: {
       'User-Agent': UA,
       Accept: 'application/json',
       'Content-Type': 'application/json',
       Referer: 'https://chzzk.naver.com/',
-      ...(cookie ? { Cookie: cookie } : {}),
+      ...(opts.cookie ? { Cookie: opts.cookie } : {}),
     },
+    ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
   });
   const body = (await res.json()) as { code: number; message: string; content: T };
   if (body.code !== 200) {
@@ -80,4 +90,53 @@ export function getAccessToken(chatChannelId: string, cookie?: string): Promise<
 
 export function getUserStatus(cookie: string): Promise<UserStatus> {
   return get<UserStatus>(GAME_BASE, '/v1/user/getUserStatus', {}, cookie);
+}
+
+export interface NoticePayload {
+  message: string;
+  messageTime: number;
+  messageUserIdHash: string;
+  streamingChannelId: string;
+}
+
+export async function postNotice(chatChannelId: string, cookie: string, p: NoticePayload): Promise<void> {
+  await request<void>(GAME_BASE, '/v1/chats/notices', {
+    method: 'POST',
+    cookie,
+    body: { channelId: chatChannelId, chatType: 'STREAMING', ...p },
+  });
+}
+
+export async function deleteNotice(chatChannelId: string, cookie: string, p: NoticePayload): Promise<void> {
+  await request<void>(GAME_BASE, '/v1/chats/notices', {
+    method: 'DELETE',
+    cookie,
+    body: { channelId: chatChannelId, chatType: 'STREAMING', ...p },
+  });
+}
+
+export async function blindMessage(chatChannelId: string, cookie: string, p: NoticePayload): Promise<void> {
+  await request<void>(GAME_BASE, '/v1/chats/blind-message', {
+    method: 'POST',
+    cookie,
+    body: { channelId: chatChannelId, chatType: 'STREAMING', ...p },
+  });
+}
+
+export interface ProfileCard {
+  userIdHash: string;
+  nickname: string;
+  profileImageUrl: string;
+  verifiedMark: boolean;
+  chatRestrict: boolean;
+  chatRestrictReason: string | null;
+}
+
+export function getProfileCard(chatChannelId: string, userIdHash: string, cookie?: string): Promise<ProfileCard> {
+  return get<ProfileCard>(
+    GAME_BASE,
+    `/v1/chats/${chatChannelId}/users/${userIdHash}/profile-card`,
+    { chatType: 'STREAMING' },
+    cookie,
+  );
 }

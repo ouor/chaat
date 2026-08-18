@@ -12,6 +12,7 @@ export interface ChatSession {
   liveStatus: 'OPEN' | 'CLOSE' | null;
   messages: ChatMessage[];
   notice: string | null;
+  streamingChannelId: string | null;
   sendChat: (text: string) => void;
   retry: () => void;
 }
@@ -24,6 +25,7 @@ export function useChatSession(
   const [liveStatus, setLiveStatus] = useState<'OPEN' | 'CLOSE' | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
+  const [streamingChannelId, setStreamingChannelId] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const socketRef = useRef<ChatSocket | null>(null);
 
@@ -49,6 +51,9 @@ export function useChatSession(
           accessToken: token.accessToken,
           uid: auth.uid,
           onMessage: (m) => {
+            if (typeof m.extras.streamingChannelId === 'string') {
+              setStreamingChannelId(m.extras.streamingChannelId);
+            }
             enqueueLog(channelId, m);
             setMessages((prev) =>
               prev.length >= MAX_MESSAGES ? [...prev.slice(-(MAX_MESSAGES - 1)), m] : [...prev, m],
@@ -77,5 +82,5 @@ export function useChatSession(
 
   const retry = useCallback(() => setAttempt((a) => a + 1), []);
 
-  return { connState, liveStatus, messages, notice, sendChat, retry };
+  return { connState, liveStatus, messages, notice, streamingChannelId, sendChat, retry };
 }
