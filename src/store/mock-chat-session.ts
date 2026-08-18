@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import type { ChatMessage } from '@/client/chzzk/types';
+import { enqueueLog } from '@/storage/log-repo';
 
 // Mock live chat for web/DOM analysis: keeps appending new messages so the rendered
 // HTML/CSS update can be inspected in browser devtools without any network dependency.
@@ -48,6 +49,7 @@ export function useMockChatSession(enabled: boolean): MockChatSession {
       };
       i += 1;
       setMessages((prev) => (prev.length >= 300 ? [...prev.slice(-299), m] : [...prev, m]));
+      enqueueLog('mock', m);
     }, 700);
     return () => clearInterval(t);
   }, [enabled]);

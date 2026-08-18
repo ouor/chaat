@@ -35,8 +35,11 @@ async function flush(): Promise<void> {
   const batch = buffer.splice(0, buffer.length);
   try {
     const db = await getDb();
-    await db.withExclusiveTransactionAsync(async (txn) => {
-      const stmt = await txn.prepareAsync(
+    // ponytail: withTransactionAsync instead of withExclusiveTransactionAsync so the write path
+    // also works on web (where the exclusive variant throws). Single flusher, so exclusivity adds
+    // nothing here. Upgrade back if a second writer appears.
+    await db.withTransactionAsync(async () => {
+      const stmt = await db.prepareAsync(
         'INSERT OR IGNORE INTO messages (channel_id, chat_channel_id, user_id_hash, nickname, message, type, msg_time, extras_json, created_at) VALUES (?,?,?,?,?,?,?,?,?)',
       );
       try {
@@ -57,7 +60,9 @@ async function flush(): Promise<void> {
         await stmt.finalizeAsync();
       }
     });
-  } catch {
+    console.log('[log] flushed batch', batch.length);
+  } catch (e) {
+    console.log('[log] flush FAILED', e);
     buffer.unshift(...batch);
   }
 }
@@ -75,10 +80,12 @@ export interface LogRow {
 
 export async function getLogs(channelId: string): Promise<LogRow[]> {
   const db = await getDb();
-  return db.getAllAsync<LogRow>(
+  const rows = await db.getAllAsync<LogRow>(
     'SELECT nickname, message, type, msg_time FROM messages WHERE channel_id = ? ORDER BY msg_time ASC',
     channelId,
   );
+  console.log('[log] getLogs', channelId, 'rows=', rows.length);
+  return rows;
 }
 
 export async function countLogs(channelId: string): Promise<number> {
