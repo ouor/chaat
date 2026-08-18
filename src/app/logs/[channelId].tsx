@@ -1,6 +1,6 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/ui/icon';
@@ -45,6 +45,7 @@ export default function LogsScreen() {
   const theme = useTheme();
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
 
   useFocusEffect(
     useCallback(() => {
@@ -62,6 +63,27 @@ export default function LogsScreen() {
       };
     }, [channelId]),
   );
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return entries;
+    const out: Entry[] = [];
+    let pendingHeader: string | null = null;
+    for (const e of entries) {
+      if (e.kind === 'header') {
+        pendingHeader = e.label;
+        continue;
+      }
+      if (e.row.message.toLowerCase().includes(q) || e.row.nickname.toLowerCase().includes(q)) {
+        if (pendingHeader) {
+          out.push({ kind: 'header', label: pendingHeader });
+          pendingHeader = null;
+        }
+        out.push(e);
+      }
+    }
+    return out;
+  }, [entries, query]);
 
   return (
     <View style={[styles.root, { backgroundColor: theme.canvasSoft }]}>
@@ -81,6 +103,19 @@ export default function LogsScreen() {
         <Text style={[styles.bannerText, { color: theme.mute }]}>READ-ONLY · SAVED ON THIS DEVICE</Text>
       </View>
 
+      {entries.length > 0 ? (
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search messages or nicknames"
+          placeholderTextColor={theme.mute}
+          style={[
+            styles.searchInput,
+            { backgroundColor: theme.canvasSoft, borderColor: theme.hairline, color: theme.ink },
+          ]}
+        />
+      ) : null}
+
       {loading ? (
         <View style={styles.empty}>
           <Text style={{ color: theme.mute }}>Loading…</Text>
@@ -97,7 +132,7 @@ export default function LogsScreen() {
         </View>
       ) : (
         <FlatList
-          data={entries}
+          data={filtered}
           renderItem={({ item }) =>
             item.kind === 'header' ? (
               <View style={[styles.groupHeader, { backgroundColor: theme.canvas, borderBottomColor: theme.hairline }]}>
@@ -115,6 +150,13 @@ export default function LogsScreen() {
           }
           keyExtractor={(item, index) => (item.kind === 'header' ? `h${index}` : `r${index}`)}
           style={{ flex: 1 }}
+          ListEmptyComponent={
+            query.trim() ? (
+              <View style={styles.empty}>
+                <Text style={{ color: theme.mute }}>No matching messages</Text>
+              </View>
+            ) : null
+          }
         />
       )}
     </View>
@@ -141,6 +183,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   bannerText: { fontSize: 10, letterSpacing: 1.2, fontFamily: 'monospace' },
+  searchInput: {
+    height: 38,
+    marginHorizontal: Spacing.lg,
+    marginVertical: Spacing.sm,
+    borderWidth: 1,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.md,
+    fontSize: 13,
+  },
   groupHeader: {
     paddingHorizontal: Spacing.lg,
     paddingVertical: 9,
