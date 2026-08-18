@@ -1,7 +1,7 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { ChatMessage } from '@/client/chzzk/types';
@@ -9,6 +9,7 @@ import { ChatRow } from '@/components/chat/chat-row';
 import { Icon } from '@/components/ui/icon';
 import { Radius, Spacing } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
+import { useAuth } from '@/store/auth-context';
 import { useChatSession } from '@/store/chat-session';
 
 const CONN_META: Record<string, { label: string; color: 'primarySoft' | 'mute' | 'danger' }> = {
@@ -23,12 +24,14 @@ export default function ChatScreen() {
   const router = useRouter();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { connState, liveStatus, messages, retry } = useChatSession(channelId);
+  const { loggedIn, cookie, uid } = useAuth();
+  const { connState, liveStatus, messages, sendChat, retry } = useChatSession(channelId, { cookie, uid });
 
   const listRef = useRef<FlashListRef<ChatMessage>>(null);
   const atBottom = useRef(true);
   const prevCount = useRef(0);
   const [unread, setUnread] = useState(0);
+  const [draft, setDraft] = useState('');
 
   const conn = CONN_META[connState] ?? CONN_META.connecting;
   const isLive = liveStatus === 'OPEN';
@@ -56,6 +59,16 @@ export default function ChatScreen() {
   }
 
   function jumpBottom() {
+    atBottom.current = true;
+    setUnread(0);
+    listRef.current?.scrollToEnd({ animated: true });
+  }
+
+  function handleSend() {
+    const text = draft.trim();
+    if (!text) return;
+    sendChat(text);
+    setDraft('');
     atBottom.current = true;
     setUnread(0);
     listRef.current?.scrollToEnd({ animated: true });
@@ -150,21 +163,49 @@ export default function ChatScreen() {
         </View>
       ) : null}
 
-      <View
-        style={[
-          styles.inputBar,
-          { backgroundColor: theme.canvas, borderTopColor: theme.hairline, paddingBottom: Math.max(insets.bottom, 12) },
-        ]}>
-        <View style={styles.inputInner}>
-          <View style={styles.inputTextWrap}>
-            <Text style={[styles.inputTitle, { color: theme.ink }]}>Read-only</Text>
-            <Text style={[styles.inputHint, { color: theme.mute }]}>Sign in with Naver to join the chat.</Text>
+      {loggedIn ? (
+        <View
+          style={[
+            styles.inputBar,
+            { backgroundColor: theme.canvas, borderTopColor: theme.hairline, paddingBottom: Math.max(insets.bottom, 12) },
+          ]}>
+          <View style={styles.inputInner}>
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              onSubmitEditing={handleSend}
+              placeholder="Send a message"
+              placeholderTextColor={theme.mute}
+              returnKeyType="send"
+              style={[
+                styles.textInput,
+                { backgroundColor: theme.canvasSoft, borderColor: theme.hairline, color: theme.ink },
+              ]}
+            />
+            <Pressable onPress={handleSend} style={[styles.sendButton, { backgroundColor: theme.primary }]}>
+              <Text style={[styles.sendText, { color: theme.onPrimary }]}>전송</Text>
+            </Pressable>
           </View>
-          <Pressable style={[styles.signInButton, { backgroundColor: theme.primary }]}>
-            <Text style={[styles.signInText, { color: theme.onPrimary }]}>Sign in</Text>
-          </Pressable>
         </View>
-      </View>
+      ) : (
+        <View
+          style={[
+            styles.inputBar,
+            { backgroundColor: theme.canvas, borderTopColor: theme.hairline, paddingBottom: Math.max(insets.bottom, 12) },
+          ]}>
+          <View style={styles.inputInner}>
+            <View style={styles.inputTextWrap}>
+              <Text style={[styles.inputTitle, { color: theme.ink }]}>Read-only</Text>
+              <Text style={[styles.inputHint, { color: theme.mute }]}>Sign in with Naver to join the chat.</Text>
+            </View>
+            <Pressable
+              onPress={() => router.push('/login')}
+              style={[styles.signInButton, { backgroundColor: theme.primary }]}>
+              <Text style={[styles.signInText, { color: theme.onPrimary }]}>Sign in</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -261,6 +302,22 @@ const styles = StyleSheet.create({
   inputTextWrap: { flex: 1, gap: 2 },
   inputTitle: { fontSize: 12.5, fontWeight: 600 },
   inputHint: { fontSize: 11 },
+  textInput: {
+    flex: 1,
+    height: 38,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    fontSize: 14,
+  },
+  sendButton: {
+    width: 52,
+    height: 38,
+    borderRadius: Radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendText: { fontSize: 13, fontWeight: 600 },
   signInButton: {
     paddingHorizontal: Spacing.lg,
     paddingVertical: 9,
