@@ -11,6 +11,7 @@ export interface ChatSession {
   connState: ConnState;
   liveStatus: 'OPEN' | 'CLOSE' | null;
   messages: ChatMessage[];
+  notice: string | null;
   sendChat: (text: string) => void;
   retry: () => void;
 }
@@ -22,6 +23,7 @@ export function useChatSession(
   const [connState, setConnState] = useState<ConnState>('idle');
   const [liveStatus, setLiveStatus] = useState<'OPEN' | 'CLOSE' | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const socketRef = useRef<ChatSocket | null>(null);
 
@@ -33,6 +35,7 @@ export function useChatSession(
       setMessages([]);
       setConnState('connecting');
       setLiveStatus(null);
+      setNotice(null);
       try {
         const status = await getLiveStatus(channelId);
         if (cancelled) return;
@@ -51,6 +54,7 @@ export function useChatSession(
               prev.length >= MAX_MESSAGES ? [...prev.slice(-(MAX_MESSAGES - 1)), m] : [...prev, m],
             );
           },
+          onNotice: (text) => setNotice(text),
           onStateChange: setConnState,
         });
         socketRef.current = socket;
@@ -73,5 +77,5 @@ export function useChatSession(
 
   const retry = useCallback(() => setAttempt((a) => a + 1), []);
 
-  return { connState, liveStatus, messages, sendChat, retry };
+  return { connState, liveStatus, messages, notice, sendChat, retry };
 }

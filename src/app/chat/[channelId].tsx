@@ -27,9 +27,10 @@ export default function ChatScreen() {
   const isMock = channelId === 'mock';
   const real = useChatSession(channelId, { cookie, uid });
   const mock = useMockChatSession(isMock);
-  const { connState, liveStatus, messages, sendChat, retry } = isMock ? mock : real;
+  const { connState, liveStatus, messages, notice, sendChat, retry } = isMock ? mock : real;
 
   const [draft, setDraft] = useState('');
+  const [noticeOpen, setNoticeOpen] = useState(true);
 
   const data = useMemo(() => [...messages].reverse(), [messages]);
 
@@ -86,6 +87,23 @@ export default function ChatScreen() {
             <Text style={[styles.offlineRetry, { color: theme.primarySoft }]}>Retry</Text>
           </Pressable>
         </View>
+      ) : null}
+
+      {notice ? (
+        <Pressable
+          onPress={() => setNoticeOpen((v) => !v)}
+          style={[
+            styles.noticeBanner,
+            { backgroundColor: theme.canvasSoft, borderBottomColor: theme.hairline, borderLeftColor: theme.primary },
+          ]}>
+          <View style={styles.noticeTextWrap}>
+            <Text style={[styles.noticeLabel, { color: theme.primarySoft }]}>NOTICE</Text>
+            <Text style={[styles.noticeText, { color: theme.body }]} numberOfLines={noticeOpen ? undefined : 1}>
+              {notice}
+            </Text>
+          </View>
+          <Text style={{ color: theme.mute, fontSize: 10, marginTop: 8 }}>{noticeOpen ? '▲' : '▼'}</Text>
+        </Pressable>
       ) : null}
 
       <FlatList
@@ -220,6 +238,18 @@ const styles = StyleSheet.create({
   },
   offlineText: { fontSize: 12 },
   offlineRetry: { fontSize: 12, fontWeight: 600 },
+  noticeBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderLeftWidth: 2,
+  },
+  noticeTextWrap: { flex: 1, gap: 3 },
+  noticeLabel: { fontSize: 9, fontWeight: 600, letterSpacing: 2.5 },
+  noticeText: { fontSize: 12.5, lineHeight: 18 },
   listContent: { flexGrow: 1 },
   empty: {
     flex: 1,

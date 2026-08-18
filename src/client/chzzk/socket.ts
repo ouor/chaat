@@ -17,6 +17,7 @@ export interface ChatSocketOptions {
   accessToken: string;
   uid?: string;
   onMessage: (m: ChatMessage) => void;
+  onNotice?: (text: string) => void;
   onConnected?: () => void;
   onStateChange?: (s: ConnState) => void;
 }
@@ -108,7 +109,13 @@ export class ChatSocket {
       this.opts.onConnected?.();
       this.requestRecent(50);
     }
-    if (cmd === Cmd.CHAT || cmd === Cmd.DONATION || cmd === Cmd.NOTICE) {
+    if (cmd === Cmd.NOTICE) {
+      for (const m of parseChatMessages(raw)) {
+        if (m.message) this.opts.onNotice?.(m.message);
+      }
+      return;
+    }
+    if (cmd === Cmd.CHAT || cmd === Cmd.DONATION) {
       for (const m of parseChatMessages(raw)) this.opts.onMessage(m);
     }
     if (cmd === Cmd.RECENT_CHAT) {

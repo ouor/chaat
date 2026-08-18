@@ -24,6 +24,7 @@ export interface MockChatSession {
   connState: 'connected';
   liveStatus: 'OPEN';
   messages: ChatMessage[];
+  notice: string | null;
   sendChat: () => void;
   retry: () => void;
 }
@@ -54,5 +55,5 @@ export function useMockChatSession(enabled: boolean): MockChatSession {
     return () => clearInterval(t);
   }, [enabled]);
 
-  return { connState: 'connected', liveStatus: 'OPEN', messages, sendChat: () => undefined, retry: () => undefined };
+  return { connState: 'connected', liveStatus: 'OPEN', messages, notice: null, sendChat: () => undefined, retry: () => undefined };
 }
