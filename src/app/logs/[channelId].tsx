@@ -1,7 +1,6 @@
-import { FlashList } from '@shopify/flash-list';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/ui/icon';
@@ -97,7 +96,7 @@ export default function LogsScreen() {
           </Pressable>
         </View>
       ) : (
-        <FlashList
+        <FlatList
           data={entries}
           renderItem={({ item }) =>
             item.kind === 'header' ? (

@@ -1,7 +1,6 @@
-import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { ChatMessage } from '@/client/chzzk/types';
@@ -27,7 +26,10 @@ export default function ChatScreen() {
   const { loggedIn, cookie, uid } = useAuth();
   const { connState, liveStatus, messages, sendChat, retry } = useChatSession(channelId, { cookie, uid });
 
-  const listRef = useRef<FlashListRef<ChatMessage>>(null);
+  // ponytail: FlatList (RN core) instead of FlashList 2 — FlashList 2's native recyclerview +
+  // maintainVisibleContentPosition misrenders in Expo Go (blank rows, forced bottom scroll).
+  // Upgrade to FlashList once a dev build is verified.
+  const listRef = useRef<FlatList<ChatMessage>>(null);
   const atBottom = useRef(true);
   const prevCount = useRef(0);
   const [unread, setUnread] = useState(0);
@@ -42,7 +44,11 @@ export default function ChatScreen() {
     if (count === prevCount.current) return;
     const delta = count - prevCount.current;
     prevCount.current = count;
-    if (!atBottom.current) setUnread((u) => u + delta);
+    if (atBottom.current) {
+      const t = setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 0);
+      return () => clearTimeout(t);
+    }
+    setUnread((u) => u + delta);
   }, [messages.length]);
 
   function onScroll(e: {
@@ -118,18 +124,13 @@ export default function ChatScreen() {
         </View>
       ) : null}
 
-      <FlashList
+      <FlatList
         ref={listRef}
         data={messages}
         renderItem={({ item }) => <ChatRow m={item} showTime={isEnded} />}
         keyExtractor={(_, index) => String(index)}
         onScroll={onScroll}
         scrollEventThrottle={16}
-        maintainVisibleContentPosition={{
-          autoscrollToBottomThreshold: 40,
-          animateAutoScrollToBottom: true,
-          startRenderingFromBottom: true,
-        }}
         style={{ flex: 1, backgroundColor: isEnded ? theme.canvasSoft : theme.canvas }}
         ListEmptyComponent={
           connState === 'connected' ? (

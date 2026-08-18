@@ -1,7 +1,6 @@
-import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { searchChannels, type SearchResult } from '@/client/chzzk/rest';
@@ -28,7 +27,7 @@ export default function SearchScreen() {
   const [nextOffset, setNextOffset] = useState<number | null>(null);
   const [initialLoading, setInitialLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const listRef = useRef<FlashListRef<SearchChannel>>(null);
+  const listRef = useRef<FlatList<SearchChannel>>(null);
 
   const query = q.trim();
 
@@ -94,7 +93,7 @@ export default function SearchScreen() {
       </SafeAreaView>
 
       {query ? (
-        <FlashList
+        <FlatList
           ref={listRef}
           data={results}
           renderItem={({ item }) => {
