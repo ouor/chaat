@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -32,10 +32,6 @@ export default function ChatScreen() {
   const [draft, setDraft] = useState('');
 
   const data = useMemo(() => [...messages].reverse(), [messages]);
-
-  useEffect(() => {
-    console.log('[chat-ui] messages=', messages.length, 'data=', data.length, 'conn=', connState);
-  }, [messages.length, data.length, connState]);
 
   const conn = CONN_META[connState] ?? CONN_META.connecting;
   const isLive = liveStatus === 'OPEN';

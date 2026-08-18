@@ -60,7 +60,6 @@ async function flush(): Promise<void> {
         await stmt.finalizeAsync();
       }
     });
-    console.log('[log] flushed batch', batch.length);
   } catch (e) {
     console.log('[log] flush FAILED', e);
     buffer.unshift(...batch);
@@ -80,12 +79,10 @@ export interface LogRow {
 
 export async function getLogs(channelId: string): Promise<LogRow[]> {
   const db = await getDb();
-  const rows = await db.getAllAsync<LogRow>(
+  return db.getAllAsync<LogRow>(
     'SELECT nickname, message, type, msg_time FROM messages WHERE channel_id = ? ORDER BY msg_time ASC',
     channelId,
   );
-  console.log('[log] getLogs', channelId, 'rows=', rows.length);
-  return rows;
 }
 
 export async function countLogs(channelId: string): Promise<number> {
