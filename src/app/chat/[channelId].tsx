@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -42,8 +42,37 @@ export default function ChatScreen() {
   const [draft, setDraft] = useState('');
   const [noticeOpen, setNoticeOpen] = useState(true);
   const [selected, setSelected] = useState<ChatMessage | null>(null);
+  const [unread, setUnread] = useState(0);
 
   const data = useMemo(() => [...messages].reverse(), [messages]);
+
+  const listRef = useRef<FlatList<ChatMessage>>(null);
+  const atBottom = useRef(true);
+  const prevCount = useRef(0);
+
+  useEffect(() => {
+    const n = data.length;
+    if (n === prevCount.current) return;
+    const delta = n - prevCount.current;
+    prevCount.current = n;
+    if (!atBottom.current && delta > 0) setUnread((u) => u + delta);
+  }, [data.length]);
+
+  function onScroll(e: {
+    nativeEvent: { contentOffset: { y: number } };
+  }) {
+    const bottom = e.nativeEvent.contentOffset.y < 20;
+    if (bottom !== atBottom.current) {
+      atBottom.current = bottom;
+      if (bottom) setUnread(0);
+    }
+  }
+
+  function jumpBottom() {
+    atBottom.current = true;
+    setUnread(0);
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }
 
   const conn = CONN_META[connState] ?? CONN_META.connecting;
   const isLive = liveStatus === 'OPEN';
@@ -134,10 +163,13 @@ export default function ChatScreen() {
       ) : null}
 
       <FlatList
+        ref={listRef}
         inverted
         data={data}
         keyExtractor={(item, index) => `${item.userIdHash}:${item.msgTime}:${index}`}
         renderItem={({ item }) => <ChatRow m={item} showTime={isEnded} onPress={() => setSelected(item)} />}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         style={{ flex: 1, backgroundColor: isEnded ? theme.canvasSoft : theme.canvas }}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
@@ -158,6 +190,19 @@ export default function ChatScreen() {
           </View>
         }
       />
+
+      {unread > 0 ? (
+        <View pointerEvents="box-none" style={styles.unreadWrap}>
+          <Pressable
+            onPress={jumpBottom}
+            style={[styles.unreadButton, { backgroundColor: theme.canvasSoft, borderColor: theme.hairline }]}>
+            <Text style={{ color: theme.ink, fontSize: 12, fontWeight: 600 }}>
+              {unread} new {unread === 1 ? 'message' : 'messages'}
+            </Text>
+            <Icon name="down" color={theme.ink} size={10} />
+          </Pressable>
+        </View>
+      ) : null}
 
       {loggedIn ? (
         <View
@@ -327,6 +372,16 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 13.5 },
   emptyHint: { fontSize: 11.5, lineHeight: 16, textAlign: 'center' },
+  unreadWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  unreadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+  },
   inputBar: { borderTopWidth: 1 },
   inputInner: {
     flexDirection: 'row',
