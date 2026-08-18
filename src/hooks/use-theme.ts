@@ -1,8 +1,7 @@
-import { Colors, type Theme } from '@/constants/tokens';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors } from '@/constants/tokens';
+import { useSettings } from '@/store/settings';
 
 export function useTheme() {
-  const scheme = useColorScheme();
-  const theme: Theme = scheme === 'dark' ? 'dark' : 'light';
+  const { theme } = useSettings();
   return Colors[theme];
 }

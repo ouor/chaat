@@ -4,6 +4,9 @@ import { StyleSheet, Text, View } from 'react-native';
 import type { ChatMessage } from '@/client/chzzk/types';
 import { Radius, Spacing } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
+import { useSettings, type FontScale } from '@/store/settings';
+
+const CHAT_FONT: Record<FontScale, number> = { sm: 13, md: 14, lg: 16, xl: 18 };
 
 const NICKS = ['nick1', 'nick2', 'nick3', 'nick4', 'nick5', 'nick6'] as const;
 type NickKey = (typeof NICKS)[number];
@@ -48,6 +51,8 @@ export const ChatRow = memo(function ChatRow({
   showTime: boolean;
 }) {
   const theme = useTheme();
+  const { fontScale } = useSettings();
+  const font = CHAT_FONT[fontScale];
   const nickColor = theme[nickKey(m.userIdHash)];
 
   if (m.msgType === 'system') {
@@ -62,7 +67,7 @@ export const ChatRow = memo(function ChatRow({
           <Text style={[styles.donoNick, { color: theme.primarySoft }]}>{m.nickname}</Text>
           {amount ? <Text style={[styles.donoAmount, { color: theme.primarySoft }]}>{amount}</Text> : null}
         </View>
-        <Text style={[styles.donoMsg, { color: theme.ink }]}>{m.message}</Text>
+        <Text style={[styles.donoMsg, { color: theme.ink, fontSize: font }]}>{m.message}</Text>
       </View>
     );
   }
@@ -71,7 +76,7 @@ export const ChatRow = memo(function ChatRow({
     return (
       <View style={[styles.sub, { borderColor: theme.hairline }]}>
         <Text style={[styles.subLabel, { color: theme.primarySoft }]}>SUB</Text>
-        <Text style={[styles.subText, { color: theme.body }]}>{m.message}</Text>
+        <Text style={[styles.subText, { color: theme.body, fontSize: font }]}>{m.message}</Text>
       </View>
     );
   }
@@ -83,7 +88,7 @@ export const ChatRow = memo(function ChatRow({
         <Text style={[styles.nick, { color: nickColor }]} numberOfLines={1}>
           {m.nickname}
         </Text>
-        <Text style={[styles.message, { color: theme.ink }]}>{m.message}</Text>
+        <Text style={[styles.message, { color: theme.ink, fontSize: font }]}>{m.message}</Text>
         {showTime ? <Text style={[styles.time, { color: theme.mute }]}>{fmtTime(m.msgTime)}</Text> : null}
       </View>
     </View>

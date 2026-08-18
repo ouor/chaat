@@ -85,11 +85,27 @@ export async function getLogs(channelId: string): Promise<LogRow[]> {
   );
 }
 
-export async function countLogs(channelId: string): Promise<number> {
+export async function countLogs(channelId?: string): Promise<number> {
   const db = await getDb();
   const row = await db.getFirstAsync<{ c: number }>(
-    'SELECT COUNT(*) AS c FROM messages WHERE channel_id = ?',
-    channelId,
+    channelId ? 'SELECT COUNT(*) AS c FROM messages WHERE channel_id = ?' : 'SELECT COUNT(*) AS c FROM messages',
+    ...(channelId ? [channelId] : []),
   );
   return row?.c ?? 0;
+}
+
+export async function clearLogs(channelId?: string): Promise<void> {
+  const db = await getDb();
+  if (channelId) {
+    await db.runAsync('DELETE FROM messages WHERE channel_id = ?', channelId);
+  } else {
+    await db.runAsync('DELETE FROM messages');
+  }
+}
+
+export async function pruneLogs(days: number): Promise<void> {
+  if (!days) return;
+  const db = await getDb();
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  await db.runAsync('DELETE FROM messages WHERE msg_time < ?', cutoff);
 }
