@@ -278,7 +278,12 @@ export function selfCheck(): void {
         msg: 'hello',
         msgTypeCode: 1,
         msgTime: 1700000003000,
-        profile: JSON.stringify({ userIdHash: 'u1', nickname: '쒼만두', userRoleCode: 'common_user' }),
+        profile: JSON.stringify({
+          userIdHash: 'u1',
+          nickname: '쒼만두',
+          userRoleCode: 'common_user',
+          profileImageUrl: 'https://nng-phinf.pstatic.net/x/1.png',
+        }),
       },
       {
         uid: 'u2',
@@ -292,6 +297,7 @@ export function selfCheck(): void {
   });
   assert(live.length === 2, 'live array parse');
   assert(live[0].nickname === '쒼만두' && live[0].message === 'hello' && live[0].msgTime === 1700000003000, 'live first');
+  assert(live[0].profileImageUrl === 'https://nng-phinf.pstatic.net/x/1.png', 'live profile image');
   assert(live[1].msgType === 'donation' && live[1].donationAmount === 3000 && live[1].role === 'manager', 'live second');
 
   const recent = parseRecentChat({
