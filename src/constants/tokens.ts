@@ -27,6 +27,10 @@ export const Colors = {
     nick4: '#f2c46b',
     nick5: '#f59fd2',
     nick6: '#a9bde0',
+    // App mark (same as the launcher icon): green slash on a black tile. A brand constant, not UI
+    // accent, so it is identical in both themes; the dark tile is lifted one step off the canvas.
+    brandTile: '#1c1c1e',
+    brandMark: '#00d992',
   },
   light: {
     canvas: '#ffffff',
@@ -50,6 +54,8 @@ export const Colors = {
     nick4: '#8f5d00',
     nick5: '#b0307a',
     nick6: '#46598a',
+    brandTile: '#101010',
+    brandMark: '#00d992',
   },
 } as const;
 
