@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { blindMessage, deleteNotice, getChannel, getProfileCard, postNotice, type ProfileCard } from '@/client/chzzk/rest';
 import type { ChatMessage } from '@/client/chzzk/types';
 import { ANONYMOUS_DONOR, ChatRow, ProfileThumb } from '@/components/chat/chat-row';
 import { ChannelAvatar } from '@/components/channel/channel-avatar';
@@ -27,6 +26,7 @@ import { ScreenHeader } from '@/components/ui/screen-header';
 import { Radius, Spacing, TOUCH, Type } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
+import { blindChat, clearChatNotice, postChatNotice, useChannelDetail, useProfileCard } from '@/store/channel';
 import { useChatSession } from '@/store/chat-session';
 import { toggleFavorite, useFavorites } from '@/store/favorites';
 import { useMockChatSession } from '@/store/mock-chat-session';
@@ -88,44 +88,14 @@ export default function ChatScreen() {
   const [unread, setUnread] = useState(0);
   const [composerOpen, setComposerOpen] = useState(false);
   const [noticeDraft, setNoticeDraft] = useState('');
-  const [channelName, setChannelName] = useState<string | null>(null);
-  const [channelImage, setChannelImage] = useState<string | null>(null);
-  const [profileCard, setProfileCard] = useState<ProfileCard | null>(null);
   const [readOnlyHidden, setReadOnlyHidden] = useState(false);
 
   const fav = favorites.find((f) => f.channelId === channelId);
   // Favorites already know the name/image, so the header is right before getChannel returns.
-  const name = channelName ?? fav?.channelName ?? (isMock ? '미리보기 채널' : '');
-  const image = channelImage ?? fav?.channelImageUrl ?? null;
-
-  useEffect(() => {
-    if (!selected || !chatChannelId) return;
-    let cancelled = false;
-    getProfileCard(chatChannelId, selected.userIdHash, cookie)
-      .then((c) => {
-        if (!cancelled) setProfileCard(c);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [selected, chatChannelId, cookie]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (isMock) return;
-    getChannel(channelId)
-      .then((c) => {
-        if (!cancelled) {
-          setChannelName(c.channelName);
-          setChannelImage(c.channelImageUrl);
-        }
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [channelId, isMock]);
+  const detail = useChannelDetail(channelId, !isMock);
+  const name = detail?.channelName ?? fav?.channelName ?? (isMock ? '미리보기 채널' : '');
+  const image = detail?.channelImageUrl || fav?.channelImageUrl || null;
+  const profileCard = useProfileCard(chatChannelId, selected?.userIdHash ?? null, cookie);
 
   const data = useMemo(() => [...messages].reverse(), [messages]);
 
@@ -190,7 +160,6 @@ export default function ChatScreen() {
   function closeProfile() {
     setActionError(null);
     setSelected(null);
-    setProfileCard(null);
     setConfirmBlind(false);
   }
 
@@ -213,12 +182,7 @@ export default function ChatScreen() {
       setConfirmBlind(true);
       return;
     }
-    void blindMessage(chatChannelId, cookie, {
-      message: selected.message,
-      messageTime: selected.msgTime,
-      messageUserIdHash: selected.userIdHash,
-      streamingChannelId,
-    })
+    void blindChat({ chatChannelId, streamingChannelId, cookie }, selected)
       .then(closeProfile)
       .catch(() => setActionError('메시지를 가리지 못했어요. 잠시 후 다시 시도해 주세요.'));
   }
@@ -227,12 +191,7 @@ export default function ChatScreen() {
     if (!chatChannelId || !cookie || !streamingChannelId || !uid) return;
     const text = noticeDraft.trim();
     if (!text) return;
-    void postNotice(chatChannelId, cookie, {
-      message: text,
-      messageTime: Date.now(),
-      messageUserIdHash: uid,
-      streamingChannelId,
-    })
+    void postChatNotice({ chatChannelId, streamingChannelId, cookie }, uid, text)
       .then(() => {
         setActionError(null);
         setComposerOpen(false);
@@ -243,12 +202,7 @@ export default function ChatScreen() {
 
   function handleClearNotice() {
     if (!chatChannelId || !cookie || !streamingChannelId || !uid) return;
-    void deleteNotice(chatChannelId, cookie, {
-      message: '',
-      messageTime: Date.now(),
-      messageUserIdHash: uid,
-      streamingChannelId,
-    })
+    void clearChatNotice({ chatChannelId, streamingChannelId, cookie }, uid)
       .then(() => {
         setActionError(null);
         setComposerOpen(false);
