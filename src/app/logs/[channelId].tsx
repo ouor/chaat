@@ -12,7 +12,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
 import { useEmojiMap } from '@/store/emoji-map';
 import { useFavorites } from '@/store/favorites';
-import { getLogs, LOG_LIMIT, type LogRow } from '@/storage/log-repo';
+import { loadChatLogs, LOG_LIMIT, type LogRow } from '@/store/chat-logs';
 
 type Entry =
   | { kind: 'header'; label: string }
@@ -90,7 +90,7 @@ export default function LogsScreen() {
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      getLogs(channelId, debouncedQuery)
+      loadChatLogs(channelId, debouncedQuery)
         .then((r) => {
           if (cancelled) return;
           setRows(r);

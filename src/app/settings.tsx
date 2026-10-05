@@ -13,7 +13,7 @@ import { Radius, Spacing, TOUCH, Type } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
 import { updateSettings, useSettings, type ChatVariant, type FontScale, type RetentionDays, type ThemeMode } from '@/store/settings';
-import { clearLogs, countLogs, pruneLogs } from '@/storage/log-repo';
+import { applyRetention, clearSavedChats, countSavedChats } from '@/store/chat-logs';
 
 function Card({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   const theme = useTheme();
@@ -48,7 +48,7 @@ export default function SettingsScreen() {
   const [confirmClear, setConfirmClear] = useState(false);
 
   const refreshCount = useCallback(() => {
-    void countLogs().then(setLogCount);
+    void countSavedChats().then(setLogCount);
   }, []);
 
   useFocusEffect(refreshCount);
@@ -127,7 +127,7 @@ export default function SettingsScreen() {
               value={settings.retentionDays}
               onSelect={(v) => {
                 updateSettings({ retentionDays: v });
-                void pruneLogs(v).then(refreshCount);
+                void applyRetention(v).then(refreshCount);
               }}
             />
           </Field>
@@ -167,7 +167,7 @@ export default function SettingsScreen() {
               stretch
               onPress={() => {
                 setConfirmClear(false);
-                void clearLogs().then(refreshCount);
+                void clearSavedChats().then(refreshCount);
               }}
             />
           </View>
