@@ -58,6 +58,9 @@ export function useChatSession(
   const [attempt, setAttempt] = useState(0);
   const socketRef = useRef<ChatSocket | null>(null);
   const readingRef = useRef(false);
+  // Which channel the current messages belong to. Reconnecting the same channel (sign-in resolving
+  // after the room opened, retry) keeps what is on screen; the recent-chat replay is deduped.
+  const shownChannelRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,10 +82,13 @@ export function useChatSession(
     };
 
     (async () => {
-      setMessages([]);
+      if (shownChannelRef.current !== channelId) {
+        shownChannelRef.current = channelId;
+        setMessages([]);
+        setLiveStatus(null);
+        setNotice(null);
+      }
       setConnState('connecting');
-      setLiveStatus(null);
-      setNotice(null);
       try {
         const status = await getLiveStatus(channelId);
         if (cancelled) return;
