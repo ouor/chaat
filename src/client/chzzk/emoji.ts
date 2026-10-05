@@ -7,7 +7,11 @@ export interface EmojiSegment {
 
 const EMOJI_RE = /\{:([^{}:]+):\}/g;
 
-export function splitEmoji(text: string, emojiMap: Record<string, string>): EmojiSegment[] {
+export function splitEmoji(
+  text: string,
+  emojiMap: Record<string, string>,
+  messageEmojis?: Record<string, string>,
+): EmojiSegment[] {
   const out: EmojiSegment[] = [];
   let last = 0;
   let m: RegExpExecArray | null;
@@ -16,7 +20,7 @@ export function splitEmoji(text: string, emojiMap: Record<string, string>): Emoj
   while ((m = EMOJI_RE.exec(text)) !== null) {
     if (m.index > last) out.push({ key: `t${i++}`, text: text.slice(last, m.index) });
     const id = m[1];
-    const url = emojiMap[id];
+    const url = messageEmojis?.[id] ?? emojiMap[id];
     if (url) {
       out.push({ key: `e${i++}`, emojiId: id, imageUrl: url });
     } else {

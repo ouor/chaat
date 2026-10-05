@@ -117,7 +117,7 @@ export const ChatRow = memo(function ChatRow({
             <Text style={[styles.donoAmount, { color: theme.primarySoft, fontSize: isCard ? 17 : 13 }]}>{amount}</Text>
           ) : null}
         </View>
-        <EmojiText text={m.message} emojiMap={emojis} fontSize={font} color={theme.ink} />
+        <EmojiText text={m.message} emojiMap={emojis} messageEmojis={m.emojis} fontSize={font} color={theme.ink} />
       </Pressable>
     );
   }
@@ -143,7 +143,7 @@ export const ChatRow = memo(function ChatRow({
             </Text>
             {showTime ? <Text style={[styles.time, { color: theme.mute }]}>{fmtTime(m.msgTime)}</Text> : null}
           </View>
-          <EmojiText text={m.message} emojiMap={emojis} fontSize={font} color={theme.ink} />
+          <EmojiText text={m.message} emojiMap={emojis} messageEmojis={m.emojis} fontSize={font} color={theme.ink} />
         </View>
       </Pressable>
     );
@@ -157,7 +157,7 @@ export const ChatRow = memo(function ChatRow({
         <Text style={[styles.nick, { color: nickColor }]} numberOfLines={1}>
           {m.nickname}
         </Text>
-        <EmojiText text={m.message} emojiMap={emojis} fontSize={font} color={theme.ink} />
+        <EmojiText text={m.message} emojiMap={emojis} messageEmojis={m.emojis} fontSize={font} color={theme.ink} />
         {showTime ? <Text style={[styles.time, { color: theme.mute }]}>{fmtTime(m.msgTime)}</Text> : null}
       </View>
     </Pressable>

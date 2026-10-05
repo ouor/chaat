@@ -7,17 +7,19 @@ import { splitEmoji } from '@/client/chzzk/emoji';
 export function EmojiText({
   text,
   emojiMap,
+  messageEmojis,
   fontSize,
   color,
   opacity = 1,
 }: {
   text: string;
   emojiMap: Record<string, string>;
+  messageEmojis?: Record<string, string>;
   fontSize: number;
   color: string;
   opacity?: number;
 }) {
-  const segments = useMemo(() => splitEmoji(text, emojiMap), [text, emojiMap]);
+  const segments = useMemo(() => splitEmoji(text, emojiMap, messageEmojis), [text, emojiMap, messageEmojis]);
 
   return (
     <View style={[styles.row, { opacity }]}>

@@ -125,6 +125,15 @@ function roleFrom(v: unknown): ChatRole {
   return 'member';
 }
 
+function emojisFrom(extras: Record<string, unknown>): Record<string, string> | undefined {
+  if (!isRecord(extras.emojis)) return undefined;
+  const out: Record<string, string> = {};
+  for (const [id, url] of Object.entries(extras.emojis)) {
+    if (typeof url === 'string' && url.startsWith('https://')) out[id] = url;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 function msgTypeFrom(code: unknown): MsgType {
   return (typeof code === 'number' && MSG_TYPE[code]) || 'text';
 }
@@ -177,6 +186,7 @@ function messageFromBdy(raw: Record<string, unknown>, chatChannelId: string): Ch
     msgTime,
     extras,
     donationAmount,
+    emojis: emojisFrom(extras),
   };
 }
 
@@ -300,6 +310,21 @@ export function selfCheck(): void {
   assert(live[0].profileImageUrl === 'https://nng-phinf.pstatic.net/x/1.png', 'live profile image');
   assert(live[1].msgType === 'donation' && live[1].donationAmount === 3000 && live[1].role === 'manager', 'live second');
 
+  // Subscription emojis ride in each message's extras.emojis (verified against a raw frame).
+  const subEmoji = parseChatMessage({
+    cmd: Cmd.CHAT,
+    cid: 'abc',
+    bdy: {
+      uid: 'u3',
+      msg: '{:yasiroDdam:}',
+      msgTypeCode: 1,
+      extras: JSON.stringify({ emojis: { yasiroDdam: 'https://x/ddam.png', bad: 'javascript:1' } }),
+      profile: JSON.stringify({ nickname: 'n' }),
+    },
+  });
+  assert(subEmoji?.emojis?.yasiroDdam === 'https://x/ddam.png', 'extras emojis parse');
+  assert(subEmoji?.emojis?.bad === undefined, 'extras emojis reject non-https');
+
   const recent = parseRecentChat({
     ver: '2',
     cmd: Cmd.RECENT_CHAT,
@@ -338,4 +363,6 @@ export function selfCheck(): void {
   assert(seg.length === 4, 'emoji split count');
   assert(seg[1].emojiId === 'd_1' && seg[1].imageUrl === 'https://x/1.png', 'emoji image lookup');
   assert(seg[3].text === '{:unknown:}', 'unknown emoji kept as text');
+  const own = splitEmoji('{:sub_1:}', {}, { sub_1: 'https://x/s.png' });
+  assert(own[0].imageUrl === 'https://x/s.png', 'message emoji lookup');
 }
