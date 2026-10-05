@@ -1,3 +1,5 @@
+import { AppState, type NativeEventSubscription } from 'react-native';
+
 import type { ChatMessage } from '@/client/chzzk/types';
 
 import { getDb } from './db';
@@ -9,13 +11,23 @@ interface PendingLog {
 
 const buffer: PendingLog[] = [];
 const FLUSH_MS = 1000;
+// ponytail: if the DB keeps failing, failed batches are re-queued up to this many rows and the
+// oldest are dropped past it, so a dead DB can't grow memory until the app is killed (losing all).
+// Upgrade path: spill to a file if a persistently failing DB ever shows up in practice.
+const MAX_BUFFER = 20000;
 let timer: ReturnType<typeof setInterval> | null = null;
+let appStateSub: NativeEventSubscription | null = null;
+let flushing: Promise<void> | null = null;
 
 function startTimer(): void {
   if (timer) return;
   timer = setInterval(() => {
     void flush();
   }, FLUSH_MS);
+  // Backgrounded apps get killed without warning; persist the buffer while we still can.
+  appStateSub ??= AppState.addEventListener('change', (s) => {
+    if (s !== 'active') void flushNow();
+  });
 }
 
 export function enqueueLog(channelId: string, m: ChatMessage): void {
@@ -28,9 +40,19 @@ export function stopLogging(): void {
     clearInterval(timer);
     timer = null;
   }
+  appStateSub?.remove();
+  appStateSub = null;
 }
 
-async function flush(): Promise<void> {
+// Single flusher: a slow write must not overlap the next tick's transaction on the same connection.
+function flush(): Promise<void> {
+  flushing ??= writeBuffered().finally(() => {
+    flushing = null;
+  });
+  return flushing;
+}
+
+async function writeBuffered(): Promise<void> {
   if (buffer.length === 0) return;
   const batch = buffer.splice(0, buffer.length);
   try {
@@ -63,10 +85,15 @@ async function flush(): Promise<void> {
   } catch (e) {
     console.log('[log] flush FAILED', e);
     buffer.unshift(...batch);
+    if (buffer.length > MAX_BUFFER) {
+      const dropped = buffer.splice(0, buffer.length - MAX_BUFFER).length;
+      console.warn(`[log] buffer over ${MAX_BUFFER}, dropped ${dropped} oldest`);
+    }
   }
 }
 
 export async function flushNow(): Promise<void> {
+  if (flushing) await flushing;
   await flush();
 }
 
