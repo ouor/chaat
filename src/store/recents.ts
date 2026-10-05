@@ -20,3 +20,13 @@ export function addRecentSearch(q: string): string[] {
   kv.setString(KEY, JSON.stringify(next));
   return next;
 }
+
+export function removeRecentSearch(q: string): string[] {
+  const next = getRecentSearches().filter((x) => x !== q);
+  kv.setString(KEY, JSON.stringify(next));
+  return next;
+}
+
+export function clearRecentSearches(): void {
+  kv.setString(KEY, JSON.stringify([]));
+}

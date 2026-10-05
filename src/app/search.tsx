@@ -1,22 +1,33 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { searchChannels, type SearchResult } from '@/client/chzzk/rest';
 import type { SearchChannel } from '@/client/chzzk/types';
 import { ChannelAvatar } from '@/components/channel/channel-avatar';
+import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
-import { Radius, Spacing } from '@/constants/tokens';
+import { IconButton } from '@/components/ui/icon-button';
+import { LiveBadge } from '@/components/ui/live-badge';
+import { Radius, Spacing, TOUCH, Type } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { toggleFavorite, useFavorites } from '@/store/favorites';
-import { addRecentSearch, getRecentSearches } from '@/store/recents';
+import { addRecentSearch, clearRecentSearches, getRecentSearches, removeRecentSearch } from '@/store/recents';
 
 const PAGE_SIZE = 20;
+// Search returns every channel whose name matches, including empty look-alikes of a real
+// streamer. Channels under this many followers (and not live / verified) fold behind a button.
+const SMALL_CHANNEL_FOLLOWERS = 10;
 
 function formatFollowers(n: number): string {
   if (n >= 10000) return `${(n / 10000).toFixed(n >= 100000 ? 0 : 1)}만`;
   return n.toLocaleString();
+}
+
+function isSmall(item: SearchChannel): boolean {
+  const ch = item.channel;
+  return ch.followerCount < SMALL_CHANNEL_FOLLOWERS && !ch.openLive && !ch.verifiedMark;
 }
 
 export default function SearchScreen() {
@@ -29,8 +40,10 @@ export default function SearchScreen() {
   const [nextOffset, setNextOffset] = useState<number | null>(null);
   const [initialLoading, setInitialLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [showSmall, setShowSmall] = useState(false);
   const [recents, setRecents] = useState<string[]>([]);
-  const listRef = useRef<FlatList<SearchChannel>>(null);
 
   const query = q.trim();
 
@@ -45,19 +58,27 @@ export default function SearchScreen() {
       const t = setTimeout(() => {
         setResults([]);
         setNextOffset(null);
+        setFailed(false);
       }, 0);
       return () => clearTimeout(t);
     }
     let cancelled = false;
     const timer = setTimeout(() => {
       setInitialLoading(true);
+      setFailed(false);
+      setShowSmall(false);
       searchChannels(query, { size: PAGE_SIZE })
         .then((res: SearchResult) => {
           if (cancelled) return;
           setResults(res.data);
           setNextOffset(res.nextOffset);
         })
-        .catch(() => undefined)
+        .catch(() => {
+          if (!cancelled) {
+            setResults([]);
+            setFailed(true);
+          }
+        })
         .finally(() => {
           if (!cancelled) setInitialLoading(false);
         });
@@ -66,7 +87,7 @@ export default function SearchScreen() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [query]);
+  }, [query, attempt]);
 
   function loadMore() {
     if (!query || !nextOffset || loadingMore || initialLoading) return;
@@ -80,87 +101,138 @@ export default function SearchScreen() {
       .finally(() => setLoadingMore(false));
   }
 
+  const { main, small } = useMemo(() => {
+    const m: SearchChannel[] = [];
+    const s: SearchChannel[] = [];
+    for (const r of results) (isSmall(r) ? s : m).push(r);
+    return { main: m, small: s };
+  }, [results]);
+  // With nothing big enough to show, small channels are the answer, not noise.
+  const smallVisible = showSmall || main.length === 0;
+  const data = smallVisible ? [...main, ...small] : main;
+
   const favIds = new Set(favorites.map((f) => f.channelId));
+
+  function openChannel(channelId: string) {
+    if (query) setRecents(addRecentSearch(query));
+    router.push(`/chat/${channelId}`);
+  }
 
   return (
     <View style={[styles.root, { backgroundColor: theme.canvas }]}>
-      <SafeAreaView edges={['top']} style={[styles.header, { borderBottomColor: theme.hairline }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={8}>
-          <Icon name="back" color={theme.body} />
-        </Pressable>
-        <TextInput
-          value={q}
-          onChangeText={setQ}
-          placeholder="Channel name"
-          placeholderTextColor={theme.mute}
-          autoFocus
-          style={[
-            styles.input,
-            { backgroundColor: theme.canvasSoft, borderColor: theme.hairline, color: theme.ink },
-          ]}
-        />
+      <SafeAreaView edges={['top']} style={styles.header}>
+        <IconButton name="back" label="뒤로" onPress={() => router.back()} />
+        <View style={[styles.inputWrap, { backgroundColor: theme.canvasSoft }]}>
+          <Icon name="search" color={theme.mute} size={18} />
+          <TextInput
+            value={q}
+            onChangeText={setQ}
+            placeholder="채널 이름으로 검색"
+            placeholderTextColor={theme.mute}
+            autoFocus
+            returnKeyType="search"
+            onSubmitEditing={() => query && setRecents(addRecentSearch(query))}
+            style={[Type.body, styles.input, { color: theme.ink }]}
+          />
+          {q ? (
+            <Pressable onPress={() => setQ('')} hitSlop={10} accessibilityLabel="검색어 지우기">
+              <View style={[styles.clear, { backgroundColor: theme.canvasSoft2 }]}>
+                <Icon name="close" color={theme.body} size={12} />
+              </View>
+            </Pressable>
+          ) : null}
+        </View>
       </SafeAreaView>
 
       {query ? (
         <FlatList
-          ref={listRef}
-          data={results}
+          data={data}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           renderItem={({ item }) => {
             const ch = item.channel;
             const fav = favIds.has(ch.channelId);
+            const dim = isSmall(item);
             return (
-              <View style={[styles.row, { borderBottomColor: theme.hairline }]}>
+              <View style={styles.row}>
                 <Pressable
-                  onPress={() => {
-                    if (query) setRecents(addRecentSearch(query));
-                    router.push(`/chat/${ch.channelId}`);
-                  }}
-                  style={styles.rowMain}
-                  hitSlop={4}>
-                  <View style={styles.avatar}>
-                    <ChannelAvatar uri={ch.channelImageUrl} name={ch.channelName} size={40} />
-                  </View>
+                  onPress={() => openChannel(ch.channelId)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${ch.channelName} 채팅 열기`}
+                  style={({ pressed }) => [
+                    styles.rowMain,
+                    pressed && { backgroundColor: theme.canvasSoft },
+                    dim && styles.dim,
+                  ]}>
+                  <ChannelAvatar uri={ch.channelImageUrl} name={ch.channelName} size={48} />
                   <View style={styles.rowText}>
                     <View style={styles.rowTitle}>
-                      <Text style={[styles.rowName, { color: theme.ink }]} numberOfLines={1}>
+                      <Text style={[Type.bodyStrong, styles.rowName, { color: theme.ink }]} numberOfLines={1}>
                         {ch.channelName}
                       </Text>
-                      {ch.openLive ? (
-                        <View style={[styles.livePill, { backgroundColor: theme.primary }]}>
-                          <Text style={[styles.livePillText, { color: theme.onPrimary }]}>LIVE</Text>
+                      {ch.verifiedMark ? (
+                        <View style={[styles.verified, { backgroundColor: theme.canvasSoft2 }]}>
+                          <Text style={[Type.badge, { color: theme.body }]}>인증</Text>
                         </View>
                       ) : null}
+                      {ch.openLive ? <LiveBadge /> : null}
                     </View>
-                    <Text style={[styles.rowSub, { color: theme.mute }]}>
-                      {formatFollowers(ch.followerCount)} followers
+                    <Text style={[Type.caption, { color: theme.mute }]}>
+                      팔로워 {formatFollowers(ch.followerCount)}명
                     </Text>
                   </View>
                 </Pressable>
-                <Pressable
-                  onPress={() => {
-                    toggleFavorite({ channelId: ch.channelId, channelName: ch.channelName, channelImageUrl: ch.channelImageUrl });
-                  }}
-                  style={styles.starButton}
-                  hitSlop={8}>
-                  <Text style={{ color: fav ? theme.primary : theme.mute, fontSize: 18 }}>{fav ? '★' : '☆'}</Text>
-                </Pressable>
+                <IconButton
+                  name={fav ? 'starFilled' : 'star'}
+                  label={fav ? '즐겨찾기에서 빼기' : '즐겨찾기에 추가'}
+                  color={fav ? 'favorite' : 'mute'}
+                  onPress={() =>
+                    toggleFavorite({ channelId: ch.channelId, channelName: ch.channelName, channelImageUrl: ch.channelImageUrl })
+                  }
+                />
               </View>
             );
           }}
           keyExtractor={(item) => item.channel.channelId}
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
-          style={{ flex: 1 }}
+          style={styles.list}
           contentContainerStyle={styles.listContent}
+          ListHeaderComponent={
+            data.length > 0 ? (
+              <Text style={[Type.caption, styles.listHint, { color: theme.mute }]}>
+                ☆ 을 누르면 홈에 즐겨찾기로 저장돼요
+              </Text>
+            ) : null
+          }
+          ListFooterComponent={
+            loadingMore ? (
+              <ActivityIndicator color={theme.mute} style={styles.footerSpinner} />
+            ) : !smallVisible && small.length > 0 ? (
+              <Pressable
+                onPress={() => setShowSmall(true)}
+                style={({ pressed }) => [styles.moreButton, { backgroundColor: pressed ? theme.canvasSoft2 : theme.canvasSoft }]}>
+                <Text style={[Type.label, { color: theme.body }]}>팔로워가 적은 채널 {small.length}개 더 보기</Text>
+              </Pressable>
+            ) : null
+          }
           ListEmptyComponent={
             <View style={styles.empty}>
               {initialLoading ? (
-                <Text style={{ color: theme.mute }}>Searching…</Text>
+                <ActivityIndicator color={theme.mute} />
+              ) : failed ? (
+                <>
+                  <Text style={[Type.bodyStrong, { color: theme.ink }]}>검색하지 못했어요</Text>
+                  <Text style={[Type.label, styles.emptyHint, { color: theme.mute }]}>
+                    인터넷 연결을 확인하고 다시 시도해 주세요.
+                  </Text>
+                  <Button label="다시 시도" variant="secondary" onPress={() => setAttempt((a) => a + 1)} />
+                </>
               ) : (
                 <>
-                  <Text style={[styles.emptyTitle, { color: theme.ink }]}>No channels found</Text>
-                  <Text style={[styles.emptyHint, { color: theme.mute }]}>
-                    Check the spelling, or try the channel&apos;s Korean name.
+                  <Text style={[Type.bodyStrong, { color: theme.ink }]}>‘{query}’ 채널이 없어요</Text>
+                  <Text style={[Type.label, styles.emptyHint, { color: theme.mute }]}>
+                    맞춤법을 확인하거나 다른 이름으로 검색해 보세요.
                   </Text>
                 </>
               )}
@@ -168,22 +240,46 @@ export default function SearchScreen() {
           }
         />
       ) : (
-        <View style={[styles.empty, { backgroundColor: theme.canvas, alignItems: 'flex-start' }]}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.idle}>
           {recents.length > 0 ? (
             <>
-              <Text style={[styles.recentLabel, { color: theme.mute }]}>RECENT</Text>
+              <View style={styles.recentHeader}>
+                <Text style={[Type.heading, { color: theme.ink }]}>최근 검색</Text>
+                <Pressable
+                  onPress={() => {
+                    clearRecentSearches();
+                    setRecents([]);
+                  }}
+                  hitSlop={12}>
+                  <Text style={[Type.label, { color: theme.mute }]}>전체 삭제</Text>
+                </Pressable>
+              </View>
               <View style={styles.recentWrap}>
                 {recents.map((r) => (
-                  <Pressable key={r} onPress={() => setQ(r)} style={[styles.recentChip, { borderColor: theme.hairline }]}>
-                    <Text style={{ color: theme.ink, fontSize: 13 }}>{r}</Text>
-                  </Pressable>
+                  <View key={r} style={[styles.recentChip, { backgroundColor: theme.canvasSoft }]}>
+                    <Pressable onPress={() => setQ(r)} style={styles.recentLabel}>
+                      <Text style={[Type.label, { color: theme.ink }]}>{r}</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setRecents(removeRecentSearch(r))}
+                      hitSlop={8}
+                      accessibilityLabel={`${r} 검색 기록 지우기`}
+                      style={styles.recentRemove}>
+                      <Icon name="close" color={theme.mute} size={14} />
+                    </Pressable>
+                  </View>
                 ))}
               </View>
             </>
           ) : (
-            <Text style={{ color: theme.mute }}>Type a channel name to search</Text>
+            <View style={styles.guide}>
+              <Text style={[Type.bodyStrong, { color: theme.ink }]}>어떤 채널을 찾으세요?</Text>
+              <Text style={[Type.label, { color: theme.mute, fontWeight: 400 }]}>
+                스트리머 이름이나 채널 이름을 입력해 보세요.{'\n'}방송 중이 아니어도 채팅을 볼 수 있어요.
+              </Text>
+            </View>
           )}
-        </View>
+        </ScrollView>
       )}
     </View>
   );
@@ -194,53 +290,61 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: 1,
+    gap: Spacing.xs,
+    paddingLeft: Spacing.xs,
+    paddingRight: Spacing.lg,
+    paddingVertical: Spacing.xs,
   },
-  backButton: { width: 30, height: 32, alignItems: 'center', justifyContent: 'center' },
-  input: {
+  inputWrap: {
     flex: 1,
-    height: 38,
-    paddingHorizontal: Spacing.md,
-    borderRadius: Radius.sm,
-    borderWidth: 1,
-    fontSize: 14,
-  },
-  listContent: { flexGrow: 1 },
-  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: 11,
-    borderBottomWidth: 1,
-  },
-  rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
-  avatar: {
-    width: 40,
-    height: 40,
-  },
-  rowText: { flex: 1, minWidth: 0, gap: 3 },
-  rowTitle: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
-  rowName: { fontSize: 14.5, fontWeight: 600, flexShrink: 1 },
-  livePill: {
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
-    borderRadius: Radius.pill,
-  },
-  livePillText: { fontSize: 8.5, fontWeight: 700, letterSpacing: 0.6 },
-  rowSub: { fontSize: 10.5, fontFamily: 'monospace' },
-  starButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  empty: { alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 40, paddingTop: 100 },
-  emptyTitle: { fontSize: 14.5, fontWeight: 600 },
-  emptyHint: { fontSize: 12.5, lineHeight: 18, textAlign: 'center' },
-  recentLabel: { fontSize: 11, fontWeight: 600, letterSpacing: 2.5 },
-  recentWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  recentChip: {
+    gap: Spacing.sm,
+    height: TOUCH,
     paddingHorizontal: Spacing.md,
-    paddingVertical: 6,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
+    borderRadius: Radius.lg,
   },
+  input: { flex: 1, height: TOUCH, paddingVertical: 0 },
+  clear: { width: 20, height: 20, borderRadius: Radius.pill, alignItems: 'center', justifyContent: 'center' },
+  list: { flex: 1 },
+  listContent: { flexGrow: 1, paddingBottom: Spacing.xxl },
+  listHint: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md, paddingBottom: Spacing.xs },
+  row: { flexDirection: 'row', alignItems: 'center', paddingRight: Spacing.sm },
+  rowMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingLeft: Spacing.xl,
+    paddingRight: Spacing.sm,
+    paddingVertical: Spacing.md,
+  },
+  dim: { opacity: 0.6 },
+  rowText: { flex: 1, minWidth: 0, gap: 2 },
+  rowTitle: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  rowName: { flexShrink: 1 },
+  verified: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.xs },
+  footerSpinner: { paddingVertical: Spacing.xl },
+  moreButton: {
+    marginHorizontal: Spacing.xl,
+    marginTop: Spacing.md,
+    minHeight: TOUCH,
+    borderRadius: Radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  empty: { alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.xxxxl, paddingTop: 96 },
+  emptyHint: { textAlign: 'center', fontWeight: 400, marginBottom: Spacing.sm },
+  idle: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.lg },
+  recentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.md,
+  },
+  recentWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  recentChip: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.pill, height: 38 },
+  recentLabel: { paddingLeft: Spacing.lg, paddingRight: Spacing.xs, height: 38, justifyContent: 'center' },
+  recentRemove: { paddingLeft: Spacing.xs, paddingRight: Spacing.md, height: 38, justifyContent: 'center' },
+  guide: { gap: Spacing.sm, paddingTop: Spacing.sm },
 });
