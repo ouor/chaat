@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ChatMessage } from '@/client/chzzk/types';
 import { Radius, Spacing, Type } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
+import { useProfileImage } from '@/store/profile-images';
 import { useSettings, type FontScale } from '@/store/settings';
 import { EmojiText } from '@/components/chat/emoji-text';
 
@@ -70,6 +71,7 @@ export function ProfileThumb({ uri, name, size }: { uri?: string; name: string; 
       source={{ uri }}
       style={{ width: size, height: size, borderRadius: Radius.pill, backgroundColor: theme.canvasSoft }}
       contentFit="cover"
+      cachePolicy="memory-disk"
       onError={() => setFailed(true)}
     />
   );
@@ -80,21 +82,20 @@ export const ChatRow = memo(function ChatRow({
   showTime,
   onPress,
   emojiMap,
-  profileImage: backfilledImage,
 }: {
   m: ChatMessage;
   showTime: boolean;
   // Takes the message so the list can pass one stable callback and keep memo intact.
   onPress?: (m: ChatMessage) => void;
   emojiMap?: Record<string, string>;
-  /** Backfilled image for this row's user only, so one user's backfill doesn't re-render every row. */
-  profileImage?: string;
 }) {
   const theme = useTheme();
   const { fontScale, chatVariant } = useSettings();
   const font = CHAT_FONT[fontScale];
   const isCard = chatVariant === 'card';
   const emojis = emojiMap ?? {};
+  // Subscribes to this row's user only, so one user's backfill doesn't re-render every row.
+  const backfilledImage = useProfileImage(m.profileImageUrl ? '' : m.userIdHash);
   const profileImage = m.profileImageUrl || backfilledImage;
   const nickStyle = { color: theme[nickKey(m.userIdHash || m.nickname)], fontSize: font - 1, lineHeight: font + 6 };
 

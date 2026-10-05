@@ -36,6 +36,7 @@ export function ChannelAvatar({
       source={{ uri }}
       style={{ width: size, height: size, borderRadius: Radius.pill, backgroundColor: theme.canvasSoft }}
       contentFit="cover"
+      cachePolicy="memory-disk"
       onError={() => setFailed(true)}
     />
   );

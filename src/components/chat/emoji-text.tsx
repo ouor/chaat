@@ -25,7 +25,7 @@ export function EmojiText({
     <View style={[styles.row, { opacity }]}>
       {segments.map((s) =>
         s.emojiId ? (
-          <Image key={s.key} source={{ uri: s.imageUrl }} style={[styles.emoji, { width: fontSize + 2, height: fontSize + 2 }]} contentFit="contain" />
+          <Image key={s.key} source={{ uri: s.imageUrl }} style={[styles.emoji, { width: fontSize + 2, height: fontSize + 2 }]} contentFit="contain" cachePolicy="memory-disk" />
         ) : (
           <Text key={s.key} style={{ color, fontSize, lineHeight: fontSize + 6 }}>
             {s.text}

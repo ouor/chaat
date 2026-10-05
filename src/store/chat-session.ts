@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
-import { getAccessToken, getLiveStatus, getProfileCard } from '@/client/chzzk/rest';
+import { getAccessToken, getLiveStatus } from '@/client/chzzk/rest';
 import { ChatSocket, type ConnState } from '@/client/chzzk/socket';
 import type { ChatMessage } from '@/client/chzzk/types';
 import { useEmojiMap } from '@/store/emoji-map';
@@ -12,7 +12,6 @@ const MAX_MESSAGES = 500;
 const COMMIT_MS = 100;
 // Reconnect re-requests the last 50 recent chats; they can only overlap the tail of the list.
 const DEDUP_WINDOW = 100;
-const PROFILE_CONCURRENCY = 4;
 
 function isDuplicate(prev: ChatMessage[], m: ChatMessage): boolean {
   for (let i = prev.length - 1; i >= Math.max(0, prev.length - DEDUP_WINDOW); i--) {
@@ -34,7 +33,6 @@ export interface ChatSession {
   streamingChannelId: string | null;
   canModerate: boolean;
   emojiMap: Record<string, string>;
-  profileImages: Record<string, string>;
   /** False when not connected; the caller should keep the draft. */
   sendChat: (text: string) => boolean;
   retry: () => void;
@@ -52,20 +50,14 @@ export function useChatSession(
   const [streamingChannelId, setStreamingChannelId] = useState<string | null>(null);
   const [canModerate, setCanModerate] = useState(false);
   const emojiMap = useEmojiMap(channelId, auth.cookie);
-  const [profileImages, setProfileImages] = useState<Record<string, string>>({});
   const [attempt, setAttempt] = useState(0);
   const socketRef = useRef<ChatSocket | null>(null);
-  // Users already looked up (found, no image, or failed) — each is fetched at most once.
-  const requestedProfiles = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
     let socket: ChatSocket | null = null;
     let pending: ChatMessage[] = [];
     let commitTimer: ReturnType<typeof setTimeout> | null = null;
-    const requested = requestedProfiles.current;
-    const profileQueue: string[] = [];
-    let profilesInFlight = 0;
 
     const commit = () => {
       commitTimer = null;
@@ -77,23 +69,6 @@ export function useChatSession(
         if (next.length === prev.length) return prev;
         return next.length > MAX_MESSAGES ? next.slice(-MAX_MESSAGES) : next;
       });
-    };
-
-    const pumpProfiles = (cid: string) => {
-      while (!cancelled && profilesInFlight < PROFILE_CONCURRENCY && profileQueue.length > 0) {
-        const id = profileQueue.shift() as string;
-        profilesInFlight += 1;
-        getProfileCard(cid, id, auth.cookie)
-          .then((pc) => {
-            const url = pc.profileImageUrl;
-            if (url) setProfileImages((prev) => ({ ...prev, [id]: url }));
-          })
-          .catch(() => undefined)
-          .finally(() => {
-            profilesInFlight -= 1;
-            pumpProfiles(cid);
-          });
-      }
     };
 
     (async () => {
@@ -124,14 +99,6 @@ export function useChatSession(
             if (auth.uid && m.userIdHash === auth.uid && (m.role === 'streamer' || m.role === 'manager')) {
               setCanModerate(true);
             }
-            if (!m.profileImageUrl && !requested.has(m.userIdHash)) {
-              // ponytail: chat WS profiles omit profileImageUrl, so backfill from profile-card,
-              // once per user, at most PROFILE_CONCURRENCY in flight. Failed lookups aren't retried
-              // this session; add a retry with backoff if transient failures show up as missing avatars.
-              requested.add(m.userIdHash);
-              profileQueue.push(m.userIdHash);
-              pumpProfiles(cid);
-            }
             enqueueLog(channelId, m);
             pending.push(m);
             commitTimer ??= setTimeout(commit, COMMIT_MS);
@@ -150,8 +117,6 @@ export function useChatSession(
     return () => {
       cancelled = true;
       if (commitTimer) clearTimeout(commitTimer);
-      // Never fetched: let the next session look these users up.
-      for (const id of profileQueue) requested.delete(id);
       socket?.close();
       socketRef.current = null;
     };
@@ -178,7 +143,6 @@ export function useChatSession(
     streamingChannelId,
     canModerate,
     emojiMap,
-    profileImages,
     sendChat,
     retry,
   };

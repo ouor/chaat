@@ -1,7 +1,17 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type ViewToken,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { blindMessage, deleteNotice, getChannel, getProfileCard, postNotice, type ProfileCard } from '@/client/chzzk/rest';
@@ -20,6 +30,7 @@ import { useAuth } from '@/store/auth-context';
 import { useChatSession } from '@/store/chat-session';
 import { toggleFavorite, useFavorites } from '@/store/favorites';
 import { useMockChatSession } from '@/store/mock-chat-session';
+import { requestProfileImages, useProfileImage } from '@/store/profile-images';
 
 const CONN_META: Record<string, { label: string; color: 'primarySoft' | 'mute' | 'danger' }> = {
   connecting: { label: '연결 중…', color: 'mute' },
@@ -50,12 +61,26 @@ export default function ChatScreen() {
   const isMock = channelId === 'mock';
   const real = useChatSession(channelId, { cookie, uid });
   const mock = useMockChatSession(isMock, ended === '1');
-  const { connState, liveStatus, messages, notice, chatChannelId, streamingChannelId, canModerate, emojiMap, profileImages, sendChat, retry } =
+  const { connState, liveStatus, messages, notice, chatChannelId, streamingChannelId, canModerate, emojiMap, sendChat, retry } =
     isMock ? mock : real;
 
   const [draft, setDraft] = useState('');
   const [noticeOpen, setNoticeOpen] = useState(true);
   const [selected, setSelected] = useState<ChatMessage | null>(null);
+  const selectedImage = useProfileImage(selected && !selected.profileImageUrl ? selected.userIdHash : '');
+
+  // Avatars are backfilled only for rows on screen (see profile-images). FlatList forbids swapping
+  // onViewableItemsChanged, so the handler is created once and reads the chat room id from a ref.
+  const chatChannelIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    chatChannelIdRef.current = chatChannelId;
+  }, [chatChannelId]);
+  const [onViewableItemsChanged] = useState(() => ({ viewableItems }: { viewableItems: ViewToken<ChatMessage>[] }) => {
+    const cid = chatChannelIdRef.current;
+    if (!cid) return;
+    const ids = viewableItems.flatMap((v) => (v.item && !v.item.profileImageUrl ? [v.item.userIdHash] : []));
+    if (ids.length > 0) requestProfileImages(cid, ids);
+  });
   const [confirmBlind, setConfirmBlind] = useState(false);
   const [unread, setUnread] = useState(0);
   const [composerOpen, setComposerOpen] = useState(false);
@@ -151,11 +176,10 @@ export default function ChatScreen() {
         m={item}
         showTime={isEnded}
         emojiMap={emojiMap}
-        profileImage={profileImages[item.userIdHash]}
         onPress={setSelected}
       />
     ),
-    [isEnded, emojiMap, profileImages],
+    [isEnded, emojiMap],
   );
 
   function closeProfile() {
@@ -307,6 +331,7 @@ export default function ChatScreen() {
           // Content-based key (same identity as the store dedup): an index key would shift on every
           // new message in this reversed list and remount every visible row.
           keyExtractor={chatKey}
+          onViewableItemsChanged={onViewableItemsChanged}
           renderItem={renderItem}
           onScroll={onScroll}
           scrollEventThrottle={16}
@@ -425,7 +450,7 @@ export default function ChatScreen() {
           <View style={styles.sheetBody}>
             <View style={styles.sheetHead}>
               <ProfileThumb
-                uri={selected.profileImageUrl || profileImages[selected.userIdHash]}
+                uri={selected.profileImageUrl || selectedImage}
                 name={selected.nickname || ANONYMOUS_DONOR}
                 size={52}
               />
