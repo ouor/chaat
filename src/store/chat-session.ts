@@ -69,12 +69,9 @@ export function useChatSession(
         setLiveStatus(status.status);
         setChatChannelId(status.chatChannelId);
 
-        const token = await getAccessToken(status.chatChannelId, auth.cookie);
-        if (cancelled) return;
-
         socket = new ChatSocket({
           chatChannelId: status.chatChannelId,
-          accessToken: token.accessToken,
+          getAccessToken: () => getAccessToken(status.chatChannelId, auth.cookie).then((t) => t.accessToken),
           uid: auth.uid,
           onMessage: (m) => {
             if (typeof m.extras.streamingChannelId === 'string') {

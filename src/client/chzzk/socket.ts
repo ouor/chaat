@@ -14,7 +14,8 @@ export type ConnState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | '
 
 export interface ChatSocketOptions {
   chatChannelId: string;
-  accessToken: string;
+  /** Called on every (re)connect so a reconnect never reuses an expired token. */
+  getAccessToken: () => Promise<string>;
   uid?: string;
   onMessage: (m: ChatMessage) => void;
   onNotice?: (text: string) => void;
@@ -30,6 +31,7 @@ function socketUrl(chatChannelId: string): string {
 export class ChatSocket {
   private ws: WebSocket | null = null;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private sid: string | undefined;
   private state: ConnState = 'idle';
   private retries = 0;
@@ -39,7 +41,7 @@ export class ChatSocket {
 
   connect(): void {
     this.closed = false;
-    this.openSocket();
+    void this.openSocket();
   }
 
   sendChat(text: string): void {
@@ -61,6 +63,10 @@ export class ChatSocket {
 
   close(): void {
     this.closed = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this.stopPing();
     this.ws?.close();
     this.ws = null;
@@ -74,12 +80,21 @@ export class ChatSocket {
     }
   }
 
-  private openSocket(): void {
+  private async openSocket(): Promise<void> {
+    this.reconnectTimer = null;
     this.setState(this.retries > 0 ? 'reconnecting' : 'connecting');
+    let accTkn: string;
+    try {
+      accTkn = await this.opts.getAccessToken();
+    } catch {
+      if (!this.closed) this.scheduleReconnect();
+      return;
+    }
+    if (this.closed) return;
     const ws = new WebSocket(socketUrl(this.opts.chatChannelId));
     this.ws = ws;
     ws.onopen = () => {
-      this.send(JSON.stringify(connectMessage(this.opts.chatChannelId, { accTkn: this.opts.accessToken, uid: this.opts.uid })));
+      this.send(JSON.stringify(connectMessage(this.opts.chatChannelId, { accTkn, uid: this.opts.uid })));
     };
     ws.onmessage = (e) => this.onData(e);
     ws.onclose = () => this.onClose();
@@ -87,6 +102,7 @@ export class ChatSocket {
   }
 
   private onData(e: MessageEvent): void {
+    if (this.closed) return;
     let raw: unknown;
     try {
       raw = JSON.parse(typeof e.data === 'string' ? e.data : String(e.data));
@@ -105,6 +121,7 @@ export class ChatSocket {
     if (cmd === Cmd.CONNECTED) {
       const bdy = (raw as { bdy?: Record<string, unknown> }).bdy;
       if (bdy && typeof bdy.sid === 'string') this.sid = bdy.sid;
+      this.retries = 0;
       this.setState('connected');
       this.opts.onConnected?.();
       this.requestRecent(50);
@@ -130,9 +147,13 @@ export class ChatSocket {
       this.setState('offline');
       return;
     }
+    this.scheduleReconnect();
+  }
+
+  private scheduleReconnect(): void {
     const delay = Math.min(1000 * 2 ** this.retries, 15000);
     this.retries += 1;
-    setTimeout(() => this.openSocket(), delay);
+    this.reconnectTimer = setTimeout(() => void this.openSocket(), delay);
   }
 
   private schedulePing(): void {

@@ -29,7 +29,7 @@ async function main() {
   };
   const sock = new ChatSocket({
     chatChannelId: status.chatChannelId,
-    accessToken: token.accessToken,
+    getAccessToken: async () => token.accessToken,
     onMessage,
     onConnected: () => {
       connected = true;

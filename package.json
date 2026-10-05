@@ -52,7 +52,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "check": "tsx scripts/check-protocol.ts",
+    "check": "tsx scripts/check-protocol.ts && tsx scripts/check-socket.ts",
     "verify:chzzk": "tsx scripts/verify-chzzk.ts",
     "postinstall": "patch-package"
   },
