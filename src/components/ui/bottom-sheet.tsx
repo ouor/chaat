@@ -1,4 +1,4 @@
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Radius, Spacing } from '@/constants/tokens';
@@ -17,7 +17,9 @@ export function BottomSheet({
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={[styles.overlay, { backgroundColor: theme.scrim }]}>
+      {/* Modal windows are edge-to-edge too (adjustResize is a no-op), so sheets with inputs
+          (notice composer) must lift themselves above the keyboard. */}
+      <KeyboardAvoidingView behavior="padding" style={[styles.overlay, { backgroundColor: theme.scrim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="닫기" />
         <View
           style={[
@@ -27,7 +29,7 @@ export function BottomSheet({
           <View style={[styles.handle, { backgroundColor: theme.canvasSoft2 }]} />
           {children}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
