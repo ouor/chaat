@@ -104,12 +104,30 @@ export interface LogRow {
   msg_time: number;
 }
 
-export async function getLogs(channelId: string): Promise<LogRow[]> {
+// ponytail: the viewer shows only the newest LOG_LIMIT matching rows; older ones are reachable
+// by narrowing the search. Upgrade path: keyset pagination on msg_time when scrolling up.
+export const LOG_LIMIT = 2000;
+
+/** Newest LOG_LIMIT rows (oldest first), optionally filtered by a message/nickname substring. */
+export async function getLogs(channelId: string, query = ''): Promise<LogRow[]> {
   const db = await getDb();
-  return db.getAllAsync<LogRow>(
-    'SELECT nickname, message, type, msg_time FROM messages WHERE channel_id = ? ORDER BY msg_time ASC',
-    channelId,
-  );
+  const q = query.trim().toLowerCase();
+  const rows = q
+    ? await db.getAllAsync<LogRow>(
+        `SELECT nickname, message, type, msg_time FROM messages
+         WHERE channel_id = ? AND (instr(lower(message), ?) > 0 OR instr(lower(nickname), ?) > 0)
+         ORDER BY msg_time DESC LIMIT ?`,
+        channelId,
+        q,
+        q,
+        LOG_LIMIT,
+      )
+    : await db.getAllAsync<LogRow>(
+        'SELECT nickname, message, type, msg_time FROM messages WHERE channel_id = ? ORDER BY msg_time DESC LIMIT ?',
+        channelId,
+        LOG_LIMIT,
+      );
+  return rows.reverse();
 }
 
 export async function countLogs(channelId?: string): Promise<number> {

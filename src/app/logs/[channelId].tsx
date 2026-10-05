@@ -1,5 +1,5 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -46,14 +46,23 @@ export default function LogsScreen() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [hasAny, setHasAny] = useState(false);
 
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query), 250);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  // Search runs in SQL so it covers the whole archive, not just the rows loaded on screen.
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      setLoading(true);
-      getLogs(channelId)
+      getLogs(channelId, debouncedQuery)
         .then((rows) => {
-          if (!cancelled) setEntries(groupByDate(rows));
+          if (cancelled) return;
+          setEntries(groupByDate(rows));
+          if (!debouncedQuery.trim()) setHasAny(rows.length > 0);
         })
         .finally(() => {
           if (!cancelled) setLoading(false);
@@ -61,29 +70,8 @@ export default function LogsScreen() {
       return () => {
         cancelled = true;
       };
-    }, [channelId]),
+    }, [channelId, debouncedQuery]),
   );
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return entries;
-    const out: Entry[] = [];
-    let pendingHeader: string | null = null;
-    for (const e of entries) {
-      if (e.kind === 'header') {
-        pendingHeader = e.label;
-        continue;
-      }
-      if (e.row.message.toLowerCase().includes(q) || e.row.nickname.toLowerCase().includes(q)) {
-        if (pendingHeader) {
-          out.push({ kind: 'header', label: pendingHeader });
-          pendingHeader = null;
-        }
-        out.push(e);
-      }
-    }
-    return out;
-  }, [entries, query]);
 
   return (
     <View style={[styles.root, { backgroundColor: theme.canvasSoft }]}>
@@ -103,7 +91,7 @@ export default function LogsScreen() {
         <Text style={[styles.bannerText, { color: theme.mute }]}>READ-ONLY · SAVED ON THIS DEVICE</Text>
       </View>
 
-      {entries.length > 0 ? (
+      {hasAny ? (
         <TextInput
           value={query}
           onChangeText={setQuery}
@@ -120,7 +108,7 @@ export default function LogsScreen() {
         <View style={styles.empty}>
           <Text style={{ color: theme.mute }}>Loading…</Text>
         </View>
-      ) : entries.length === 0 ? (
+      ) : !hasAny ? (
         <View style={[styles.emptyCard, { borderColor: theme.hairline }]}>
           <Text style={[styles.emptyTitle, { color: theme.ink }]}>Nothing saved yet</Text>
           <Text style={[styles.emptyHint, { color: theme.mute }]}>
@@ -132,7 +120,7 @@ export default function LogsScreen() {
         </View>
       ) : (
         <FlatList
-          data={filtered}
+          data={entries}
           renderItem={({ item }) =>
             item.kind === 'header' ? (
               <View style={[styles.groupHeader, { backgroundColor: theme.canvas, borderBottomColor: theme.hairline }]}>
