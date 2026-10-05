@@ -22,7 +22,7 @@ const FEATURES: { icon: IconName; title: string; body: string }[] = [
   {
     icon: 'phone',
     title: '내 폰에 자동 저장',
-    body: '본 채팅은 폰에 남아요. 내 채팅이나 후원이 읽혔는지 나중에 다시 확인할 수 있어요.',
+    body: '채팅방을 열어 둔 동안의 채팅이 폰에 저장돼요. 방송이 끝난 뒤에도 내가 쓴 채팅을 다시 찾아볼 수 있어요.',
   },
 ];
 

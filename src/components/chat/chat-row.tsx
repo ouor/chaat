@@ -104,7 +104,7 @@ export const ChatRow = memo(function ChatRow({
         <View style={styles.donoHead}>
           <Text style={[styles.donoNick, { fontSize: font - 1 }]} numberOfLines={1}>
             <Text style={{ color: anonymous ? theme.body : theme.primarySoft }}>{anonymous ? '익명' : m.nickname}</Text>
-            <Text style={{ color: theme.mute, fontWeight: 400 }}>{anonymous ? ' 후원' : ' 님의 후원'}</Text>
+            <Text style={{ color: theme.body, fontWeight: 400 }}>{anonymous ? ' 후원' : ' 님의 후원'}</Text>
           </Text>
           {amount ? (
             <Text style={[styles.donoAmount, { color: theme.primarySoft, fontSize: isCard ? font + 3 : font + 1 }]}>

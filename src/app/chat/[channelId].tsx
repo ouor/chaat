@@ -315,7 +315,7 @@ export default function ChatScreen() {
             // Inverted: the header sits at the newest end, in flow, so it never covers a row.
             isEnded && connState === 'connected' && data.length > 0 ? (
               <Text style={[Type.caption, styles.endedNote, { color: theme.body }]}>
-                채팅방은 계속 열려 있어요. 새 채팅도 여기 이어져요.
+                채팅방은 계속 열려 있어요. 새 채팅이 오면 바로 보여요.
               </Text>
             ) : null
           }
