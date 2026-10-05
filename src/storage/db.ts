@@ -24,6 +24,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_dedup ON messages (channel_id, ms
 }
 
 export function getDb(): Promise<SQLite.SQLiteDatabase> {
-  if (!dbPromise) dbPromise = init();
+  if (!dbPromise) {
+    // A failed open (disk full at launch, ...) must not be cached for the whole run, or every
+    // later flush fails and the log buffer fills up; the next call retries.
+    dbPromise = init().catch((e: unknown) => {
+      dbPromise = null;
+      throw e;
+    });
+  }
   return dbPromise;
 }
