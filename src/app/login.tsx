@@ -15,7 +15,7 @@ import type { NaverCookies } from '@/storage/keychain';
 
 // Reassurance for people wary of signing in through an app they don't know yet.
 const POINTS: { icon: IconName; title: string; body: string }[] = [
-  { icon: 'lock', title: '네이버 공식 화면에서 로그인해요', body: '위에 보이는 nid.naver.com이 네이버 로그인 주소예요.' },
+  { icon: 'lock', title: '네이버 공식 페이지에서 로그인해요', body: '다음 화면에서 네이버 로그인 페이지(nid.naver.com)가 열려요.' },
   { icon: 'phone', title: '비밀번호는 앱에 저장되지 않아요', body: '로그인 후 받은 정보만 이 폰의 보안 저장소에 보관해요.' },
   { icon: 'gear', title: '언제든 로그아웃할 수 있어요', body: '설정에서 로그아웃하면 이 폰에서 바로 지워져요.' },
 ];
@@ -103,14 +103,21 @@ export default function LoginScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.canvas }]}>
-      <ScreenHeader>
-        <View style={styles.headerMain}>
-          <View style={[styles.domainPill, { backgroundColor: theme.canvasSoft }]}>
-            <Icon name="lock" color={theme.mute} size={13} />
-            <Text style={[Type.micro, { color: theme.body }]}>nid.naver.com</Text>
+      {phase === 'webview' ? (
+        // The domain is shown only while Naver's page is actually on screen; before that it read
+        // like an address bar and made the intro look like a (fake) Naver page.
+        <ScreenHeader>
+          <View style={styles.headerMain}>
+            <Text style={[Type.heading, { color: theme.ink }]}>네이버 로그인</Text>
+            <View style={[styles.domainPill, { backgroundColor: theme.canvasSoft }]}>
+              <Icon name="lock" color={theme.mute} size={13} />
+              <Text style={[Type.micro, { color: theme.body }]}>nid.naver.com</Text>
+            </View>
           </View>
-        </View>
-      </ScreenHeader>
+        </ScreenHeader>
+      ) : (
+        <ScreenHeader title="로그인" />
+      )}
 
       {phase === 'idle' ? (
         <>
@@ -177,7 +184,7 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  headerMain: { flex: 1, flexDirection: 'row' },
+  headerMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   domainPill: {
     flexDirection: 'row',
     alignItems: 'center',
