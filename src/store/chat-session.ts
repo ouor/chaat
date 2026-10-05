@@ -6,6 +6,8 @@ import type { ChatMessage } from '@/client/chzzk/types';
 import { enqueueLog } from '@/storage/log-repo';
 
 const MAX_MESSAGES = 500;
+// Burst chat arrives as many frames per second; commit them to state at most this often.
+const COMMIT_MS = 100;
 // Reconnect re-requests the last 50 recent chats; they can only overlap the tail of the list.
 const DEDUP_WINDOW = 100;
 
@@ -67,6 +69,20 @@ export function useChatSession(
   useEffect(() => {
     let cancelled = false;
     let socket: ChatSocket | null = null;
+    let pending: ChatMessage[] = [];
+    let commitTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const commit = () => {
+      commitTimer = null;
+      const batch = pending;
+      pending = [];
+      setMessages((prev) => {
+        const next = [...prev];
+        for (const m of batch) if (!isDuplicate(next, m)) next.push(m);
+        if (next.length === prev.length) return prev;
+        return next.length > MAX_MESSAGES ? next.slice(-MAX_MESSAGES) : next;
+      });
+    };
 
     (async () => {
       setMessages([]);
@@ -105,10 +121,8 @@ export function useChatSession(
                 .finally(() => pendingProfiles.current.delete(m.userIdHash));
             }
             enqueueLog(channelId, m);
-            setMessages((prev) => {
-              if (isDuplicate(prev, m)) return prev;
-              return prev.length >= MAX_MESSAGES ? [...prev.slice(-(MAX_MESSAGES - 1)), m] : [...prev, m];
-            });
+            pending.push(m);
+            commitTimer ??= setTimeout(commit, COMMIT_MS);
           },
           onNotice: (text) => setNotice(text),
           onStateChange: setConnState,
@@ -122,6 +136,7 @@ export function useChatSession(
 
     return () => {
       cancelled = true;
+      if (commitTimer) clearTimeout(commitTimer);
       socket?.close();
       socketRef.current = null;
     };
