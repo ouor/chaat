@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { blindMessage, deleteNotice, getChannel, getProfileCard, postNotice, type ProfileCard } from '@/client/chzzk/rest';
@@ -218,7 +218,9 @@ export default function ChatScreen() {
   const canBlind = canModerate && loggedIn && !!chatChannelId && !!streamingChannelId;
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.canvas }]}>
+    // Edge-to-edge (edgeToEdgeEnabled) makes adjustResize a no-op, so the window no longer shrinks
+    // for the keyboard; pad the screen by the keyboard height instead or it covers the input bar.
+    <KeyboardAvoidingView behavior="padding" style={[styles.root, { backgroundColor: theme.canvas }]}>
       <ScreenHeader
         right={
           <>
@@ -432,7 +434,7 @@ export default function ChatScreen() {
           </View>
         ) : null}
       </BottomSheet>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
