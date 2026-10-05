@@ -244,6 +244,13 @@ export function parseChatMessages(raw: unknown): ChatMessage[] {
   return m ? [m] : [];
 }
 
+/** CONNECTED (10100) ack; sid is required for recent-chat and send. */
+export function parseConnected(raw: unknown): { sid?: string } | null {
+  if (!isRecord(raw) || raw.cmd !== Cmd.CONNECTED) return null;
+  const bdy = isRecord(raw.bdy) ? raw.bdy : {};
+  return { sid: typeof bdy.sid === 'string' && bdy.sid ? bdy.sid : undefined };
+}
+
 /** A message hidden after it was sent; identifies it by sender + send time. */
 export interface BlindEvent {
   messageTime: number;
@@ -418,6 +425,8 @@ export function selfCheck(): void {
     tid: null,
     cid: 'abc',
   });
+  assert(parseConnected({ cmd: Cmd.CONNECTED, bdy: { sid: 'S1' } })?.sid === 'S1', 'connected parse');
+  assert(parseConnected({ cmd: Cmd.CHAT }) === null, 'connected wrong cmd');
   assert(blind?.messageTime === 1791173111049 && blind.userIdHash === 'u9', 'blind parse');
   assert(parseBlind({ cmd: Cmd.BLIND, bdy: { messageTime: 1 } }) === null, 'blind without user ignored');
 

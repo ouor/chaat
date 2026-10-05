@@ -4,6 +4,7 @@ import {
   connectMessage,
   parseBlind,
   parseChatMessages,
+  parseConnected,
   parseRecentChat,
   pingMessage,
   pongMessage,
@@ -193,9 +194,9 @@ export class ChatSocket {
     if (cmd !== Cmd.PONG) {
       this.schedulePing();
     }
-    if (cmd === Cmd.CONNECTED) {
-      const bdy = (raw as { bdy?: Record<string, unknown> }).bdy;
-      if (bdy && typeof bdy.sid === 'string') this.sid = bdy.sid;
+    const connected = parseConnected(raw);
+    if (connected) {
+      this.sid = connected.sid;
       this.connectedAt = Date.now();
       this.setState('connected');
       this.opts.onConnected?.();
