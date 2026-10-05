@@ -12,6 +12,7 @@
     },
     "android": {
       "package": "com.chaat.app",
+      "versionCode": 1,
       "allowBackup": false,
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW",
