@@ -23,9 +23,9 @@ import { useMockChatSession } from '@/store/mock-chat-session';
 
 const CONN_META: Record<string, { label: string; color: 'primarySoft' | 'mute' | 'danger' }> = {
   connecting: { label: '연결 중…', color: 'mute' },
-  connected: { label: '실시간으로 보는 중', color: 'primarySoft' },
-  reconnecting: { label: '다시 연결하는 중…', color: 'mute' },
-  offline: { label: '연결이 끊겼어요', color: 'danger' },
+  connected: { label: '연결됨', color: 'mute' },
+  reconnecting: { label: '다시 연결 중…', color: 'mute' },
+  offline: { label: '연결 끊김', color: 'danger' },
 };
 
 function chatKey(m: ChatMessage): string {
@@ -39,7 +39,7 @@ const ROLE_LABEL: Record<ChatMessage['role'], string> = {
 };
 
 export default function ChatScreen() {
-  const { channelId } = useLocalSearchParams<{ channelId: string }>();
+  const { channelId, ended } = useLocalSearchParams<{ channelId: string; ended?: string }>();
   const router = useRouter();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -48,7 +48,7 @@ export default function ChatScreen() {
   const favorites = useFavorites();
   const isMock = channelId === 'mock';
   const real = useChatSession(channelId, { cookie, uid });
-  const mock = useMockChatSession(isMock);
+  const mock = useMockChatSession(isMock, ended === '1');
   const { connState, liveStatus, messages, notice, chatChannelId, streamingChannelId, canModerate, emojiMap, profileImages, sendChat, retry } =
     isMock ? mock : real;
 
@@ -134,7 +134,15 @@ export default function ChatScreen() {
   const conn = CONN_META[connState] ?? CONN_META.connecting;
   const isLive = liveStatus === 'OPEN';
   const isEnded = liveStatus === 'CLOSE';
-  const statusLabel = connState === 'connected' && isEnded ? '방송 종료 · 채팅은 계속 볼 수 있어요' : conn.label;
+  // One short status, said once. Green only while live; an ended stream gets no dot at all.
+  const status: { label: string; dot: 'primarySoft' | 'mute' | 'danger' | null } =
+    connState !== 'connected'
+      ? { label: conn.label, dot: conn.color }
+      : isLive
+        ? { label: '실시간', dot: 'primarySoft' }
+        : isEnded
+          ? { label: '방송 종료', dot: null }
+          : { label: conn.label, dot: conn.color };
 
   const renderItem = useCallback(
     ({ item }: { item: ChatMessage }) => (
@@ -232,12 +240,18 @@ export default function ChatScreen() {
                 toggleFavorite({ channelId, channelName: name || channelId, channelImageUrl: image ?? '' })
               }
             />
-            <IconButton
-              name="history"
-              label="지난 채팅 보기"
-              color="body"
+            <Pressable
               onPress={() => router.push({ pathname: '/logs/[channelId]', params: { channelId, name } })}
-            />
+              accessibilityRole="button"
+              accessibilityLabel="이 폰에 저장된 지난 채팅 보기"
+              hitSlop={4}
+              style={({ pressed }) => [
+                styles.historyButton,
+                { backgroundColor: pressed ? theme.canvasSoft2 : theme.canvasSoft },
+              ]}>
+              <Icon name="history" color={theme.body} size={16} />
+              <Text style={[Type.micro, { color: theme.ink, fontWeight: 600 }]}>지난 채팅</Text>
+            </Pressable>
             {canModerate && loggedIn ? (
               <IconButton name="megaphone" label="공지 올리기" color="body" onPress={() => setComposerOpen(true)} />
             ) : null}
@@ -250,12 +264,12 @@ export default function ChatScreen() {
               <Text style={[Type.bodyStrong, styles.channelName, { color: theme.ink }]} numberOfLines={1}>
                 {name}
               </Text>
-              {isLive ? <LiveBadge /> : isEnded ? <LiveBadge ended /> : null}
+              {isLive ? <LiveBadge /> : null}
             </View>
             <View style={styles.connRow}>
-              <View style={[styles.connDot, { backgroundColor: theme[conn.color] }]} />
-              <Text style={[Type.micro, { color: theme.mute }]} numberOfLines={1}>
-                {statusLabel}
+              {status.dot ? <View style={[styles.connDot, { backgroundColor: theme[status.dot] }]} /> : null}
+              <Text style={[Type.micro, { color: theme.body }]} numberOfLines={1}>
+                {status.label}
               </Text>
             </View>
           </View>
@@ -284,14 +298,6 @@ export default function ChatScreen() {
         </Pressable>
       ) : null}
 
-      {isEnded && connState === 'connected' ? (
-        <View style={[styles.endedNote, { backgroundColor: theme.canvasSoft }]}>
-          <Text style={[Type.caption, { color: theme.body }]}>
-            방송이 끝났어요. 채팅방은 그대로 열려 있고, 본 채팅은 이 폰에 저장돼요.
-          </Text>
-        </View>
-      ) : null}
-
       <View style={styles.listArea}>
         <FlatList
           ref={listRef}
@@ -305,6 +311,14 @@ export default function ChatScreen() {
           scrollEventThrottle={16}
           style={styles.list}
           contentContainerStyle={styles.listContent}
+          ListHeaderComponent={
+            // Inverted: the header sits at the newest end, in flow, so it never covers a row.
+            isEnded && connState === 'connected' && data.length > 0 ? (
+              <Text style={[Type.caption, styles.endedNote, { color: theme.body }]}>
+                채팅방은 계속 열려 있어요. 새 채팅도 여기 이어져요.
+              </Text>
+            ) : null
+          }
           ListEmptyComponent={
             <View style={styles.empty}>
               {connState === 'connected' ? (
@@ -469,12 +483,15 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
   },
   noticeText: { flex: 1, fontWeight: 400 },
-  endedNote: {
-    marginHorizontal: Spacing.md,
-    marginBottom: Spacing.xs,
+  endedNote: { textAlign: 'center', paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md },
+  historyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    height: 34,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.lg,
+    marginRight: Spacing.xs,
+    borderRadius: Radius.pill,
   },
   listArea: { flex: 1 },
   list: { flex: 1 },

@@ -3,16 +3,9 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Radius, Type } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
-/** Green LIVE pill, or a neutral "방송 종료" pill when `ended`. */
-export function LiveBadge({ ended = false }: { ended?: boolean }) {
+/** Green LIVE pill. Only shown while a stream is live: an ended stream has no badge. */
+export function LiveBadge() {
   const theme = useTheme();
-  if (ended) {
-    return (
-      <View style={[styles.pill, { backgroundColor: theme.canvasSoft2 }]}>
-        <Text style={[Type.badge, { color: theme.body }]}>방송 종료</Text>
-      </View>
-    );
-  }
   return (
     <View style={[styles.pill, { backgroundColor: theme.primary }]}>
       <View style={[styles.dot, { backgroundColor: theme.onPrimary }]} />

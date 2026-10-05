@@ -23,7 +23,7 @@ const TEXTS = [
 
 export interface MockChatSession {
   connState: 'connected';
-  liveStatus: 'OPEN';
+  liveStatus: 'OPEN' | 'CLOSE';
   chatChannelId: string | null;
   messages: ChatMessage[];
   notice: string | null;
@@ -35,7 +35,8 @@ export interface MockChatSession {
   retry: () => void;
 }
 
-export function useMockChatSession(enabled: boolean): MockChatSession {
+/** `ended` renders the after-stream state (`/chat/mock?ended=1`). */
+export function useMockChatSession(enabled: boolean, ended = false): MockChatSession {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   useEffect(() => {
@@ -64,7 +65,7 @@ export function useMockChatSession(enabled: boolean): MockChatSession {
 
   return {
     connState: 'connected',
-    liveStatus: 'OPEN',
+    liveStatus: ended ? 'CLOSE' : 'OPEN',
     chatChannelId: 'mock',
     messages,
     notice: null,
