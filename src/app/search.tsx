@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { searchChannels, type SearchResult } from '@/client/chzzk/rest';
+import { searchChannelPage, type SearchResult } from '@/store/channel';
 import type { SearchChannel } from '@/client/chzzk/types';
 import { ChannelAvatar } from '@/components/channel/channel-avatar';
 import { Button } from '@/components/ui/button';
@@ -72,7 +72,7 @@ export default function SearchScreen() {
       setInitialLoading(true);
       setFailed(false);
       setShowSmall(false);
-      searchChannels(query, { size: PAGE_SIZE })
+      searchChannelPage(query, PAGE_SIZE)
         .then((res: SearchResult) => {
           if (cancelled) return;
           setResults(res.data);
@@ -98,7 +98,7 @@ export default function SearchScreen() {
     if (!query || !nextOffset || loadingMore || initialLoading) return;
     setLoadingMore(true);
     const gen = listGen.current;
-    searchChannels(query, { size: PAGE_SIZE, offset: nextOffset })
+    searchChannelPage(query, PAGE_SIZE, nextOffset)
       .then((res: SearchResult) => {
         if (gen !== listGen.current) return;
         setResults((prev) => [...prev, ...res.data]);

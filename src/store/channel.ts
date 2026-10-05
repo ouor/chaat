@@ -4,14 +4,36 @@ import {
   blindMessage,
   deleteNotice,
   getChannel,
+  getLiveStatus,
   getProfileCard,
   postNotice,
+  searchChannels,
   type NoticePayload,
   type ProfileCard,
+  type SearchResult,
 } from '@/client/chzzk/rest';
 import type { ChannelDetail } from '@/client/chzzk/types';
 
-export type { ProfileCard };
+export type { ProfileCard, SearchResult };
+
+/** One page of channel search results. */
+export function searchChannelPage(query: string, size: number, offset = 0): Promise<SearchResult> {
+  return searchChannels(query, { size, offset });
+}
+
+export type LiveSummary = { open: boolean; viewers: number } | { failed: true };
+
+/** Live state of several channels at once; a failed lookup is reported, not thrown. */
+export async function loadLiveSummaries(channelIds: string[]): Promise<Record<string, LiveSummary>> {
+  const results = await Promise.allSettled(channelIds.map((id) => getLiveStatus(id)));
+  const out: Record<string, LiveSummary> = {};
+  channelIds.forEach((id, i) => {
+    const r = results[i];
+    out[id] =
+      r.status === 'fulfilled' ? { open: r.value.status === 'OPEN', viewers: r.value.concurrentUserCount } : { failed: true };
+  });
+  return out;
+}
 
 /** Channel name/image for headers; null until loaded (or when disabled / failed). */
 export function useChannelDetail(channelId: string, enabled = true): ChannelDetail | null {

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { getLiveStatus } from '@/client/chzzk/rest';
 import { ChannelAvatar } from '@/components/channel/channel-avatar';
 import { ChatPreview } from '@/components/chat/chat-preview';
 import { Brand } from '@/components/ui/brand';
@@ -14,9 +13,10 @@ import { IconButton } from '@/components/ui/icon-button';
 import { LiveBadge } from '@/components/ui/live-badge';
 import { Radius, Spacing, TOUCH, Type } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
+import { loadLiveSummaries, type LiveSummary } from '@/store/channel';
 import { useFavorites, type FavoriteChannel } from '@/store/favorites';
 
-type Live = { open: boolean; viewers: number } | { failed: true };
+type Live = LiveSummary;
 
 const FEATURES: { icon: IconName; title: string; body: string }[] = [
   { icon: 'chat', title: '채팅만 가볍게', body: '영상은 큰 화면으로 보고, 채팅은 폰으로 편하게 보세요.' },
@@ -36,15 +36,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const loadStatuses = useCallback(() => {
-    Promise.allSettled(favorites.map((f) => getLiveStatus(f.channelId))).then((results) => {
-      const map: Record<string, Live> = {};
-      favorites.forEach((f, i) => {
-        const r = results[i];
-        map[f.channelId] =
-          r.status === 'fulfilled'
-            ? { open: r.value.status === 'OPEN', viewers: r.value.concurrentUserCount }
-            : { failed: true };
-      });
+    void loadLiveSummaries(favorites.map((f) => f.channelId)).then((map) => {
       setLiveMap(map);
       setRefreshing(false);
     });
