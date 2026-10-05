@@ -3,8 +3,7 @@ import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { ChatMessage } from '@/client/chzzk/types';
-import { ChatRow } from '@/components/chat/chat-row';
+import { ChatPreview } from '@/components/chat/chat-preview';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
@@ -15,22 +14,6 @@ import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
 import { updateSettings, useSettings, type ChatVariant, type FontScale, type RetentionDays, type ThemeMode } from '@/store/settings';
 import { clearLogs, countLogs, pruneLogs } from '@/storage/log-repo';
-
-const sample = (p: Partial<ChatMessage> & Pick<ChatMessage, 'nickname' | 'message'>): ChatMessage => ({
-  chatChannelId: 'preview',
-  userIdHash: p.nickname,
-  msgType: 'text',
-  role: 'member',
-  msgTime: 0,
-  extras: {},
-  ...p,
-});
-
-const PREVIEW: ChatMessage[] = [
-  sample({ nickname: '하늘', message: '오늘 방송도 재밌었어요!' }),
-  sample({ nickname: '보라', message: '다음 방송은 언제 하나요?', role: 'manager' }),
-  sample({ nickname: '민재', message: '수고하셨습니다', msgType: 'donation', donationAmount: 1000 }),
-];
 
 function Card({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   const theme = useTheme();
@@ -127,12 +110,7 @@ export default function SettingsScreen() {
               onSelect={(v) => updateSettings({ chatVariant: v })}
             />
           </Field>
-          <View style={[styles.preview, { backgroundColor: theme.canvas }]}>
-            <Text style={[Type.micro, styles.previewLabel, { color: theme.mute }]}>미리보기</Text>
-            {PREVIEW.map((m) => (
-              <ChatRow key={m.nickname} m={m} showTime={false} />
-            ))}
-          </View>
+          <ChatPreview label="미리보기" />
         </Card>
 
         <Card
@@ -222,8 +200,6 @@ const styles = StyleSheet.create({
   sectionDesc: { paddingHorizontal: Spacing.xs, fontWeight: 400 },
   card: { borderRadius: Radius.xl, padding: Spacing.lg, gap: Spacing.xl },
   field: { gap: Spacing.sm },
-  preview: { borderRadius: Radius.lg, paddingVertical: Spacing.sm },
-  previewLabel: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xs },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: -Spacing.sm },
   statRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   linkRow: {

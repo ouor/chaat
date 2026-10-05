@@ -6,6 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getLiveStatus } from '@/client/chzzk/rest';
 import { ChannelAvatar } from '@/components/channel/channel-avatar';
+import { ChatPreview } from '@/components/chat/chat-preview';
+import { Brand } from '@/components/ui/brand';
 import { Button } from '@/components/ui/button';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
@@ -71,8 +73,7 @@ export default function HomeScreen() {
     <View style={[styles.root, { backgroundColor: theme.canvas }]}>
       <SafeAreaView edges={['top']} style={styles.header}>
         <View style={styles.brandWrap}>
-          <View style={[styles.logo, { backgroundColor: theme.primary }]} />
-          <Text style={[Type.title, { color: theme.ink }]}>chaat</Text>
+          <Brand />
         </View>
         <IconButton name="gear" label="설정" onPress={() => router.push('/settings')} />
       </SafeAreaView>
@@ -99,8 +100,9 @@ export default function HomeScreen() {
                 </View>
               ))}
             </View>
+            <ChatPreview label="채팅은 이렇게 보여요" surface="canvasSoft" />
           </ScrollView>
-          <SafeAreaView edges={['bottom']} style={styles.footer}>
+          <SafeAreaView edges={['bottom']} style={[styles.footer, { backgroundColor: theme.canvas }]}>
             <Text style={[Type.caption, styles.footerHint, { color: theme.mute }]}>
               자주 보는 채널을 즐겨찾기하면 여기에 모여요
             </Text>
@@ -166,6 +168,19 @@ export default function HomeScreen() {
               );
             }}
             keyExtractor={(item) => item.channelId}
+            ListFooterComponent={
+              <View style={[styles.tip, { backgroundColor: theme.canvasSoft }]}>
+                <View style={[styles.tipIcon, { backgroundColor: theme.canvasSoft2 }]}>
+                  <Icon name="history" color={theme.ink} size={20} />
+                </View>
+                <View style={styles.tipText}>
+                  <Text style={[Type.label, { color: theme.ink, fontWeight: 700 }]}>방송이 끝나도 들어가 보세요</Text>
+                  <Text style={[Type.caption, { color: theme.mute }]}>
+                    채팅방은 계속 열려 있어요. 채팅방 오른쪽 위 ‘지난 채팅’에서 저장된 채팅도 다시 볼 수 있어요.
+                  </Text>
+                </View>
+              </View>
+            }
             style={styles.list}
           />
         </>
@@ -184,15 +199,9 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
   },
   brandWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  logo: {
-    width: 9,
-    height: 18,
-    borderRadius: 1,
-    transform: [{ skewX: '-12deg' }],
-  },
-  onboard: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.xxxl, paddingBottom: Spacing.xxl },
+  onboard: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.xl, paddingBottom: Spacing.xxl },
   onboardSub: { marginTop: Spacing.md },
-  features: { marginTop: Spacing.xxxxl, gap: Spacing.xxl },
+  features: { marginTop: Spacing.xxxl, marginBottom: Spacing.xxl, gap: Spacing.xl },
   feature: { flexDirection: 'row', gap: Spacing.lg, alignItems: 'flex-start' },
   featureIcon: {
     width: 48,
@@ -202,7 +211,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   featureText: { flex: 1, gap: 2, paddingTop: 2 },
-  footer: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.lg },
+  footer: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md, paddingBottom: Spacing.lg },
   footerHint: { textAlign: 'center', marginBottom: Spacing.md },
   searchBar: {
     flexDirection: 'row',
@@ -223,6 +232,17 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.sm,
   },
   list: { flex: 1 },
+  tip: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.xl,
+    marginBottom: Spacing.xxl,
+    padding: Spacing.lg,
+    borderRadius: Radius.xl,
+  },
+  tipIcon: { width: 40, height: 40, borderRadius: Radius.pill, alignItems: 'center', justifyContent: 'center' },
+  tipText: { flex: 1, gap: 2 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
