@@ -18,6 +18,7 @@ const TEXTS = [
   'ㅎㅎㅎ',
   '소리 잘 들려요',
   '잘 보고 있어요',
+  '방송 끝나고도 채팅 계속 볼 수 있는 거 진짜 편하네요 오늘도 수고 많으셨어요',
 ];
 
 export interface MockChatSession {
@@ -45,7 +46,8 @@ export function useMockChatSession(enabled: boolean): MockChatSession {
       const m: ChatMessage = {
         chatChannelId: 'mock',
         userIdHash: `user${i % 6}`,
-        nickname: NAMES[i % NAMES.length],
+        // Every other donation is anonymous: those arrive with no sender nickname.
+        nickname: donation && i % 20 === 13 ? '' : NAMES[i % NAMES.length],
         message: `${TEXTS[i % TEXTS.length]} #${i}`,
         msgType: donation ? 'donation' : 'text',
         role: i % 13 === 0 ? 'streamer' : i % 7 === 0 ? 'manager' : 'member',

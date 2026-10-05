@@ -21,12 +21,6 @@ export const Colors = {
     danger: '#f0625a',
     favorite: '#ffc94d',
     scrim: 'rgba(0, 0, 0, 0.55)',
-    nick1: '#00d992',
-    nick2: '#5fd0b4',
-    nick3: '#a9b8b2',
-    nick4: '#d8d3cc',
-    nick5: '#8b949e',
-    nick6: '#2fd6a1',
   },
   light: {
     canvas: '#ffffff',
@@ -45,12 +39,6 @@ export const Colors = {
     danger: '#e5383b',
     favorite: '#f5a700',
     scrim: 'rgba(0, 0, 0, 0.4)',
-    nick1: '#0a8f61',
-    nick2: '#166e59',
-    nick3: '#4b5a55',
-    nick4: '#6a5f54',
-    nick5: '#4f5b64',
-    nick6: '#0d7f57',
   },
 } as const;
 

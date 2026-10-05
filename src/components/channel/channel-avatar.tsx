@@ -22,9 +22,9 @@ export function ChannelAvatar({
       <View
         style={[
           styles.initial,
-          { width: size, height: size, borderRadius: Radius.pill, backgroundColor: theme.canvasSoft, borderColor: theme.hairline },
+          { width: size, height: size, borderRadius: Radius.pill, backgroundColor: theme.canvasSoft2 },
         ]}>
-        <Text style={[styles.text, { color: theme.mute, fontSize: size * 0.4, fontWeight: '600' }]}>
+        <Text style={[styles.text, { color: theme.body, fontSize: size * 0.42 }]}>
           {(name[0] ?? '?').toUpperCase()}
         </Text>
       </View>
@@ -45,9 +45,8 @@ const styles = StyleSheet.create({
   initial: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
   },
   text: {
-    fontFamily: 'monospace',
+    fontWeight: 700,
   },
 });
