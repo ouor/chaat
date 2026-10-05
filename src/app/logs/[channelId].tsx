@@ -2,6 +2,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { ANONYMOUS_DONOR } from '@/components/chat/chat-row';
 import { EmojiText } from '@/components/chat/emoji-text';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
@@ -166,7 +167,7 @@ export default function LogsScreen() {
                       </View>
                     ) : null}
                     <Text style={[Type.caption, styles.rowNick, { color: theme.body }]} numberOfLines={1}>
-                      {item.row.nickname || '익명'}
+                      {item.row.nickname || (item.row.type === 'donation' ? ANONYMOUS_DONOR : '익명')}
                     </Text>
                   </View>
                   <EmojiText

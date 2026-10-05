@@ -20,6 +20,13 @@ export const Colors = {
     onPrimary: '#101010',
     danger: '#f0625a',
     scrim: 'rgba(0, 0, 0, 0.55)',
+    // Per-user nickname hues. Never green/teal: that hue means CTA / LIVE / donation.
+    nick1: '#7cc4ff',
+    nick2: '#b9a2ff',
+    nick3: '#ff9d8f',
+    nick4: '#f2c46b',
+    nick5: '#f59fd2',
+    nick6: '#a9bde0',
   },
   light: {
     canvas: '#ffffff',
@@ -37,6 +44,12 @@ export const Colors = {
     onPrimary: '#101010',
     danger: '#e5383b',
     scrim: 'rgba(0, 0, 0, 0.4)',
+    nick1: '#1d6cb8',
+    nick2: '#6a4fc4',
+    nick3: '#c0412d',
+    nick4: '#8f5d00',
+    nick5: '#b0307a',
+    nick6: '#46598a',
   },
 } as const;
 

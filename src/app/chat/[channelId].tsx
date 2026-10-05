@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { blindMessage, deleteNotice, getChannel, getProfileCard, postNotice, type ProfileCard } from '@/client/chzzk/rest';
 import type { ChatMessage } from '@/client/chzzk/types';
-import { ChatRow, ProfileThumb } from '@/components/chat/chat-row';
+import { ANONYMOUS_DONOR, ChatRow, ProfileThumb } from '@/components/chat/chat-row';
 import { ChannelAvatar } from '@/components/channel/channel-avatar';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { Button } from '@/components/ui/button';
@@ -235,7 +235,7 @@ export default function ChatScreen() {
             <IconButton
               name={fav ? 'starFilled' : 'star'}
               label={fav ? '즐겨찾기에서 빼기' : '즐겨찾기에 추가'}
-              color={fav ? 'ink' : 'body'}
+              color={fav ? 'ink' : 'mute'}
               onPress={() =>
                 toggleFavorite({ channelId, channelName: name || channelId, channelImageUrl: image ?? '' })
               }
@@ -415,12 +415,12 @@ export default function ChatScreen() {
             <View style={styles.sheetHead}>
               <ProfileThumb
                 uri={selected.profileImageUrl || profileImages[selected.userIdHash]}
-                name={selected.nickname || '익명'}
+                name={selected.nickname || ANONYMOUS_DONOR}
                 size={52}
               />
               <View style={styles.sheetTitle}>
                 <Text style={[Type.title, { color: theme.ink }]} numberOfLines={1}>
-                  {selected.nickname || '익명'}
+                  {selected.nickname || ANONYMOUS_DONOR}
                 </Text>
                 <Text style={[Type.caption, { color: theme.mute }]}>{selectedMeta}</Text>
               </View>

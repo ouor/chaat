@@ -10,6 +10,18 @@ import { EmojiText } from '@/components/chat/emoji-text';
 
 export const CHAT_FONT: Record<FontScale, number> = { sm: 14, md: 15, lg: 17, xl: 20 };
 
+const NICKS = ['nick1', 'nick2', 'nick3', 'nick4', 'nick5', 'nick6'] as const;
+
+/** Stable per-user hue from the user hash, so one person keeps one color. */
+function nickKey(hash: string): (typeof NICKS)[number] {
+  let n = 0;
+  for (const ch of hash) n = (n * 31 + ch.charCodeAt(0)) | 0;
+  return NICKS[Math.abs(n) % NICKS.length];
+}
+
+/** The official app's wording for donations sent without a nickname. */
+export const ANONYMOUS_DONOR = '익명의 후원자';
+
 function fmtTime(t: number): string {
   const d = new Date(t);
   const hh = String(d.getHours()).padStart(2, '0');
@@ -84,8 +96,7 @@ export const ChatRow = memo(function ChatRow({
   const isCard = chatVariant === 'card';
   const emojis = emojiMap ?? {};
   const profileImage = m.profileImageUrl || backfilledImage;
-  // One nickname color for everyone: per-user hues read as a status code nobody could decode.
-  const nickStyle = { color: theme.body, fontSize: font - 1, lineHeight: font + 6 };
+  const nickStyle = { color: theme[nickKey(m.userIdHash || m.nickname)], fontSize: font - 1, lineHeight: font + 6 };
 
   const pressableProps = onPress ? { onPress: () => onPress(m) } : {};
 
@@ -103,8 +114,8 @@ export const ChatRow = memo(function ChatRow({
         style={[styles.dono, { backgroundColor: theme.primaryTint, borderLeftColor: theme.primary }]}>
         <View style={styles.donoHead}>
           <Text style={[styles.donoNick, { fontSize: font - 1 }]} numberOfLines={1}>
-            <Text style={{ color: anonymous ? theme.body : theme.primarySoft }}>{anonymous ? '익명' : m.nickname}</Text>
-            <Text style={{ color: theme.body, fontWeight: 400 }}>{anonymous ? ' 후원' : ' 님의 후원'}</Text>
+            <Text style={{ color: anonymous ? theme.body : theme.primarySoft }}>{anonymous ? ANONYMOUS_DONOR : m.nickname}</Text>
+            <Text style={{ color: theme.body, fontWeight: 400 }}> 님의 후원</Text>
           </Text>
           {amount ? (
             <Text style={[styles.donoAmount, { color: theme.primarySoft, fontSize: isCard ? font + 3 : font + 1 }]}>
