@@ -21,6 +21,9 @@ const DEFAULTS: Settings = {
   chatVariant: 'card',
 };
 const KEY = 'settings';
+// v2: two-line rows became the default. Older saves always wrote chatVariant (every update
+// persisted the whole object), so a stored 'compact' wasn't necessarily a choice; drop it once.
+const VERSION = 2;
 
 let cache: Settings | null = null;
 const listeners = new Set<() => void>();
@@ -29,7 +32,10 @@ function read(): Settings {
   if (cache) return cache;
   try {
     const raw = kv.getString(KEY);
-    cache = raw ? { ...DEFAULTS, ...(JSON.parse(raw) as Partial<Settings>) } : { ...DEFAULTS };
+    const saved = raw ? (JSON.parse(raw) as Partial<Settings> & { v?: number }) : {};
+    if (saved.v !== VERSION) delete saved.chatVariant;
+    delete saved.v;
+    cache = { ...DEFAULTS, ...saved };
   } catch {
     cache = { ...DEFAULTS };
   }
@@ -46,7 +52,7 @@ export function getSettings(): Settings {
 }
 
 export function updateSettings(patch: Partial<Settings>): void {
-  kv.setString(KEY, JSON.stringify({ ...read(), ...patch }));
+  kv.setString(KEY, JSON.stringify({ ...read(), ...patch, v: VERSION }));
   emit();
 }
 
