@@ -2,11 +2,14 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { EmojiText } from '@/components/chat/emoji-text';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { Radius, Spacing, TOUCH, Type } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
+import { useAuth } from '@/store/auth-context';
+import { useEmojiMap } from '@/store/emoji-map';
 import { useFavorites } from '@/store/favorites';
 import { getLogs, LOG_LIMIT, type LogRow } from '@/storage/log-repo';
 
@@ -51,6 +54,8 @@ export default function LogsScreen() {
   const router = useRouter();
   const theme = useTheme();
   const favorites = useFavorites();
+  const { cookie } = useAuth();
+  const emojiMap = useEmojiMap(channelId, cookie);
   const [rows, setRows] = useState<LogRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
@@ -149,7 +154,13 @@ export default function LogsScreen() {
                       {item.row.nickname || '익명'}
                     </Text>
                   </View>
-                  <Text style={[Type.body, { color: theme.ink }]}>{item.row.message}</Text>
+                  <EmojiText
+                    text={item.row.message}
+                    emojiMap={emojiMap}
+                    messageEmojis={item.row.emojis}
+                    fontSize={Type.body.fontSize}
+                    color={theme.ink}
+                  />
                 </View>
               </View>
             )

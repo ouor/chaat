@@ -134,6 +134,11 @@ function emojisFrom(extras: Record<string, unknown>): Record<string, string> | u
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
+/** Sender emoji map from a raw or stored extras value (stored logs keep extras as JSON text). */
+export function parseExtrasEmojis(extras: unknown): Record<string, string> | undefined {
+  return emojisFrom(parseExtras(extras));
+}
+
 function msgTypeFrom(code: unknown): MsgType {
   return (typeof code === 'number' && MSG_TYPE[code]) || 'text';
 }
@@ -324,6 +329,8 @@ export function selfCheck(): void {
   });
   assert(subEmoji?.emojis?.yasiroDdam === 'https://x/ddam.png', 'extras emojis parse');
   assert(subEmoji?.emojis?.bad === undefined, 'extras emojis reject non-https');
+  assert(parseExtrasEmojis('{"emojis":{"a":"https://x/a.png"}}')?.a === 'https://x/a.png', 'stored extras emojis');
+  assert(parseExtrasEmojis('not json') === undefined, 'stored extras garbage');
 
   const recent = parseRecentChat({
     ver: '2',

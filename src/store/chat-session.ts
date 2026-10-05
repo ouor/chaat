@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { getAccessToken, getEmojiPacks, getLiveStatus, getProfileCard } from '@/client/chzzk/rest';
+import { getAccessToken, getLiveStatus, getProfileCard } from '@/client/chzzk/rest';
 import { ChatSocket, type ConnState } from '@/client/chzzk/socket';
 import type { ChatMessage } from '@/client/chzzk/types';
+import { useEmojiMap } from '@/store/emoji-map';
 import { enqueueLog } from '@/storage/log-repo';
 
 const MAX_MESSAGES = 500;
@@ -45,27 +46,12 @@ export function useChatSession(
   const [notice, setNotice] = useState<string | null>(null);
   const [streamingChannelId, setStreamingChannelId] = useState<string | null>(null);
   const [canModerate, setCanModerate] = useState(false);
-  const [emojiMap, setEmojiMap] = useState<Record<string, string>>({});
+  const emojiMap = useEmojiMap(channelId, auth.cookie);
   const [profileImages, setProfileImages] = useState<Record<string, string>>({});
   const [attempt, setAttempt] = useState(0);
   const socketRef = useRef<ChatSocket | null>(null);
   // Users already looked up (found, no image, or failed) — each is fetched at most once.
   const requestedProfiles = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    let cancelled = false;
-    getEmojiPacks(channelId, auth.cookie)
-      .then((emojis) => {
-        if (cancelled) return;
-        const map: Record<string, string> = {};
-        for (const e of emojis) map[e.emojiId] = e.imageUrl;
-        setEmojiMap(map);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [channelId, auth.cookie]);
 
   useEffect(() => {
     let cancelled = false;

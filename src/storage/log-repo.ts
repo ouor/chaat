@@ -1,5 +1,6 @@
 import { AppState, type NativeEventSubscription } from 'react-native';
 
+import { parseExtrasEmojis } from '@/client/chzzk/protocol';
 import type { ChatMessage } from '@/client/chzzk/types';
 
 import { getDb } from './db';
@@ -102,7 +103,11 @@ export interface LogRow {
   message: string;
   type: string;
   msg_time: number;
+  /** Sender's own emojis saved with the message (subscription emojis aren't in the channel pack). */
+  emojis?: Record<string, string>;
 }
+
+type StoredRow = Omit<LogRow, 'emojis'> & { extras_json: string | null };
 
 // ponytail: the viewer shows only the newest LOG_LIMIT matching rows; older ones are reachable
 // by narrowing the search. Upgrade path: keyset pagination on msg_time when scrolling up.
@@ -113,8 +118,8 @@ export async function getLogs(channelId: string, query = ''): Promise<LogRow[]> 
   const db = await getDb();
   const q = query.trim().toLowerCase();
   const rows = q
-    ? await db.getAllAsync<LogRow>(
-        `SELECT nickname, message, type, msg_time FROM messages
+    ? await db.getAllAsync<StoredRow>(
+        `SELECT nickname, message, type, msg_time, extras_json FROM messages
          WHERE channel_id = ? AND (instr(lower(message), ?) > 0 OR instr(lower(nickname), ?) > 0)
          ORDER BY msg_time DESC LIMIT ?`,
         channelId,
@@ -122,12 +127,12 @@ export async function getLogs(channelId: string, query = ''): Promise<LogRow[]> 
         q,
         LOG_LIMIT,
       )
-    : await db.getAllAsync<LogRow>(
-        'SELECT nickname, message, type, msg_time FROM messages WHERE channel_id = ? ORDER BY msg_time DESC LIMIT ?',
+    : await db.getAllAsync<StoredRow>(
+        'SELECT nickname, message, type, msg_time, extras_json FROM messages WHERE channel_id = ? ORDER BY msg_time DESC LIMIT ?',
         channelId,
         LOG_LIMIT,
       );
-  return rows.reverse();
+  return rows.reverse().map(({ extras_json, ...row }) => ({ ...row, emojis: parseExtrasEmojis(extras_json) }));
 }
 
 export async function countLogs(channelId?: string): Promise<number> {
