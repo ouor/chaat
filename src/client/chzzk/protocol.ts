@@ -140,11 +140,21 @@ function roleFrom(v: unknown): ChatRole {
   return 'member';
 }
 
+// Every CHZZK image (emoji packs, profile/channel images, subscription emojis) is served from
+// Naver's pstatic.net CDN (checked against live responses). Sender-controlled URLs (extras.emojis)
+// must not make every viewer fetch an arbitrary host, so anything else is dropped.
+const TRUSTED_IMAGE = /^https:\/\/([a-z0-9-]+\.)*pstatic\.net\//i;
+
+/** True for https URLs on the CHZZK/Naver image CDN. */
+export function isTrustedImageUrl(url: unknown): url is string {
+  return typeof url === 'string' && TRUSTED_IMAGE.test(url);
+}
+
 function emojisFrom(extras: Record<string, unknown>): Record<string, string> | undefined {
   if (!isRecord(extras.emojis)) return undefined;
   const out: Record<string, string> = {};
   for (const [id, url] of Object.entries(extras.emojis)) {
-    if (typeof url === 'string' && url.startsWith('https://')) out[id] = url;
+    if (isTrustedImageUrl(url)) out[id] = url;
   }
   return Object.keys(out).length > 0 ? out : undefined;
 }
@@ -199,7 +209,7 @@ function messageFromBdy(raw: Record<string, unknown>, chatChannelId: string): Ch
     chatChannelId,
     userIdHash,
     nickname,
-    profileImageUrl: typeof profile.profileImageUrl === 'string' ? profile.profileImageUrl : undefined,
+    profileImageUrl: isTrustedImageUrl(profile.profileImageUrl) ? profile.profileImageUrl : undefined,
     message: String(bdy.msg ?? bdy.content ?? bdy.noticeMessage ?? ''),
     msgType,
     role,
@@ -338,13 +348,24 @@ export function selfCheck(): void {
       uid: 'u3',
       msg: '{:yasiroDdam:}',
       msgTypeCode: 1,
-      extras: JSON.stringify({ emojis: { yasiroDdam: 'https://x/ddam.png', bad: 'javascript:1' } }),
+      extras: JSON.stringify({
+        emojis: {
+          yasiroDdam: 'https://nng-phinf.pstatic.net/ddam.png',
+          bad: 'javascript:1',
+          evil: 'https://attacker.example/p.png',
+          spoof: 'https://pstatic.net.attacker.example/p.png',
+        },
+      }),
       profile: JSON.stringify({ nickname: 'n' }),
     },
   });
-  assert(subEmoji?.emojis?.yasiroDdam === 'https://x/ddam.png', 'extras emojis parse');
+  assert(subEmoji?.emojis?.yasiroDdam === 'https://nng-phinf.pstatic.net/ddam.png', 'extras emojis parse');
   assert(subEmoji?.emojis?.bad === undefined, 'extras emojis reject non-https');
-  assert(parseExtrasEmojis('{"emojis":{"a":"https://x/a.png"}}')?.a === 'https://x/a.png', 'stored extras emojis');
+  assert(subEmoji?.emojis?.evil === undefined && subEmoji?.emojis?.spoof === undefined, 'extras emojis reject foreign hosts');
+  assert(
+    parseExtrasEmojis('{"emojis":{"a":"https://ssl.pstatic.net/a.png"}}')?.a === 'https://ssl.pstatic.net/a.png',
+    'stored extras emojis',
+  );
   assert(parseExtrasEmojis('not json') === undefined, 'stored extras garbage');
 
   const recent = parseRecentChat({

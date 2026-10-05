@@ -1,3 +1,4 @@
+import { isTrustedImageUrl } from './protocol';
 import type { AccessToken, ChannelDetail, LiveStatus, SearchChannel, UserStatus } from './types';
 
 const SERVICE_BASE = 'https://api.chzzk.naver.com';
@@ -57,6 +58,11 @@ async function request<T>(
   return body.content;
 }
 
+// Image URLs from REST go straight into <Image>; keep them on the CHZZK CDN like WS-sourced ones.
+function trustedChannel(c: ChannelDetail): ChannelDetail {
+  return isTrustedImageUrl(c.channelImageUrl) ? c : { ...c, channelImageUrl: '' };
+}
+
 export interface SearchResult {
   data: SearchChannel[];
   nextOffset: number | null;
@@ -74,7 +80,10 @@ export function searchChannels(
       size: opts.size ?? 20,
       offset: opts.offset ?? 0,
     },
-  ).then((c) => ({ data: c.data, nextOffset: c.page.next?.offset ?? null }));
+  ).then((c) => ({
+    data: c.data.map((d) => ({ ...d, channel: trustedChannel(d.channel) })),
+    nextOffset: c.page.next?.offset ?? null,
+  }));
 }
 
 export function getLiveStatus(channelId: string): Promise<LiveStatus> {
@@ -87,7 +96,7 @@ export function getLiveStatus(channelId: string): Promise<LiveStatus> {
 
 export function getChannel(channelId: string): Promise<ChannelDetail> {
   // content IS the channel (verified against a raw response), not wrapped in { channel }.
-  return get<ChannelDetail>(SERVICE_BASE, `/service/v1/channels/${channelId}`, {});
+  return get<ChannelDetail>(SERVICE_BASE, `/service/v1/channels/${channelId}`, {}).then(trustedChannel);
 }
 
 export function getAccessToken(chatChannelId: string, cookie?: string): Promise<AccessToken> {
@@ -152,7 +161,7 @@ export function getProfileCard(chatChannelId: string, userIdHash: string, cookie
     `/v1/chats/${chatChannelId}/users/${userIdHash}/profile-card`,
     { chatType: 'STREAMING' },
     cookie,
-  );
+  ).then((pc) => (isTrustedImageUrl(pc.profileImageUrl) ? pc : { ...pc, profileImageUrl: null }));
 }
 
 export interface EmojiPack {
@@ -173,6 +182,8 @@ interface EmojiPacksContent {
 export function getEmojiPacks(channelId: string, cookie?: string): Promise<{ emojiId: string; imageUrl: string }[]> {
   return get<EmojiPacksContent>(SERVICE_BASE, `/service/v1/channels/${channelId}/emoji-packs`, {}, cookie).then((c) => {
     const all = [...c.emojiPacks, ...(c.cheatKeyEmojiPacks ?? []), ...(c.subscriptionEmojiPacks ?? [])];
-    return all.flatMap((p) => [...p.emojis, ...(p.tier1Emojis ?? []), ...(p.tier2Emojis ?? [])]);
+    return all
+      .flatMap((p) => [...p.emojis, ...(p.tier1Emojis ?? []), ...(p.tier2Emojis ?? [])])
+      .filter((e) => isTrustedImageUrl(e.imageUrl));
   });
 }
