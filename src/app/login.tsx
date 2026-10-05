@@ -42,6 +42,14 @@ export default function LoginScreen() {
   const doneRef = useRef(false);
   // A ref, not the `busy` state: the 2s poll closure is created once and would only ever see busy=false.
   const busyRef = useRef(false);
+  // If the user backs out while login() is in flight, finishing must not pop another screen.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   async function tryLogin(cookies: NaverCookies): Promise<void> {
     if (busyRef.current || doneRef.current) return;
@@ -49,6 +57,10 @@ export default function LoginScreen() {
     setBusy(true);
     const ok = await login(cookies);
     busyRef.current = false;
+    if (!mountedRef.current) {
+      doneRef.current = ok;
+      return;
+    }
     if (ok) {
       doneRef.current = true;
       router.back();
