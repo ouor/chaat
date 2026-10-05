@@ -8,6 +8,9 @@ import { useEmojiMap } from '@/store/emoji-map';
 import { enqueueLog } from '@/storage/log-repo';
 
 const MAX_MESSAGES = 500;
+// While the user is scrolled up reading, trimming the oldest rows would delete what they're
+// looking at; let the list grow to this hard cap instead and trim back once they return.
+const MAX_WHILE_READING = 2000;
 // Burst chat arrives as many frames per second; commit them to state at most this often.
 const COMMIT_MS = 100;
 // Reconnect re-requests the last 50 recent chats; they can only overlap the tail of the list.
@@ -36,6 +39,8 @@ export interface ChatSession {
   /** False when not connected; the caller should keep the draft. */
   sendChat: (text: string) => boolean;
   retry: () => void;
+  /** True while the user is scrolled away from the newest messages. */
+  setReading: (reading: boolean) => void;
 }
 
 export function useChatSession(
@@ -52,6 +57,7 @@ export function useChatSession(
   const emojiMap = useEmojiMap(channelId, auth.cookie);
   const [attempt, setAttempt] = useState(0);
   const socketRef = useRef<ChatSocket | null>(null);
+  const readingRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,7 +73,8 @@ export function useChatSession(
         const next = [...prev];
         for (const m of batch) if (!isDuplicate(next, m)) next.push(m);
         if (next.length === prev.length) return prev;
-        return next.length > MAX_MESSAGES ? next.slice(-MAX_MESSAGES) : next;
+        const cap = readingRef.current ? MAX_WHILE_READING : MAX_MESSAGES;
+        return next.length > cap ? next.slice(-cap) : next;
       });
     };
 
@@ -134,6 +141,11 @@ export function useChatSession(
 
   const retry = useCallback(() => setAttempt((a) => a + 1), []);
 
+  const setReading = useCallback((reading: boolean) => {
+    readingRef.current = reading;
+    if (!reading) setMessages((prev) => (prev.length > MAX_MESSAGES ? prev.slice(-MAX_MESSAGES) : prev));
+  }, []);
+
   return {
     connState,
     liveStatus,
@@ -145,5 +157,6 @@ export function useChatSession(
     emojiMap,
     sendChat,
     retry,
+    setReading,
   };
 }

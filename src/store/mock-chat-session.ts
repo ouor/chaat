@@ -32,6 +32,7 @@ export interface MockChatSession {
   emojiMap: Record<string, string>;
   sendChat: (text: string) => boolean;
   retry: () => void;
+  setReading: (reading: boolean) => void;
 }
 
 /** `ended` renders the after-stream state (`/chat/mock?ended=1`). */
@@ -73,5 +74,6 @@ export function useMockChatSession(enabled: boolean, ended = false): MockChatSes
     emojiMap: {},
     sendChat: () => true,
     retry: () => undefined,
+    setReading: () => undefined,
   };
 }

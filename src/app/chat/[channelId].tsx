@@ -61,7 +61,7 @@ export default function ChatScreen() {
   const isMock = channelId === 'mock';
   const real = useChatSession(channelId, { cookie, uid });
   const mock = useMockChatSession(isMock, ended === '1');
-  const { connState, liveStatus, messages, notice, chatChannelId, streamingChannelId, canModerate, emojiMap, sendChat, retry } =
+  const { connState, liveStatus, messages, notice, chatChannelId, streamingChannelId, canModerate, emojiMap, sendChat, retry, setReading } =
     isMock ? mock : real;
 
   const [draft, setDraft] = useState('');
@@ -147,12 +147,14 @@ export default function ChatScreen() {
     const bottom = e.nativeEvent.contentOffset.y < 20;
     if (bottom !== atBottom.current) {
       atBottom.current = bottom;
+      setReading(!bottom);
       if (bottom) setUnread(0);
     }
   }
 
   function jumpBottom() {
     atBottom.current = true;
+    setReading(false);
     setUnread(0);
     listRef.current?.scrollToOffset({ offset: 0, animated: true });
   }
@@ -335,6 +337,9 @@ export default function ChatScreen() {
           renderItem={renderItem}
           onScroll={onScroll}
           scrollEventThrottle={16}
+          // Scrolled up: keep the row being read in place as new chats land at index 0.
+          // Near the newest end (offset < 20): keep following new messages.
+          maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 20 }}
           style={styles.list}
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={
