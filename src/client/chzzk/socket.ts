@@ -45,7 +45,10 @@ export class ChatSocket {
   }
 
   sendChat(text: string): void {
-    if (this.state !== 'connected') return;
+    if (this.state !== 'connected') {
+      console.log('[chat] send skipped, state =', this.state);
+      return;
+    }
     const now = Date.now();
     const extras = JSON.stringify({
       chatType: 'STREAMING',
@@ -53,6 +56,7 @@ export class ChatSocket {
       osType: 'PC',
       streamingChannelId: this.opts.chatChannelId,
     });
+    console.log('[chat] send', { len: text.length, hasSid: !!this.sid });
     this.send(JSON.stringify(sendChatMessage(this.opts.chatChannelId, text, now, extras, this.sid)));
   }
 
@@ -94,6 +98,7 @@ export class ChatSocket {
     const ws = new WebSocket(socketUrl(this.opts.chatChannelId));
     this.ws = ws;
     ws.onopen = () => {
+      console.log('[chat] connect', this.opts.uid ? 'SEND' : 'READ');
       this.send(JSON.stringify(connectMessage(this.opts.chatChannelId, { accTkn, uid: this.opts.uid })));
     };
     ws.onmessage = (e) => this.onData(e);
@@ -111,6 +116,11 @@ export class ChatSocket {
     }
     if (typeof raw !== 'object' || raw === null) return;
     const cmd = (raw as { cmd?: number }).cmd;
+    // ponytail: diagnostic for the "message not sent" report — dumps every non-routine frame
+    // (send acks, errors) to logcat so we parse what the server actually answers. Remove once fixed.
+    if (cmd !== Cmd.PING && cmd !== Cmd.PONG && cmd !== Cmd.CHAT && cmd !== Cmd.DONATION && cmd !== Cmd.RECENT_CHAT) {
+      console.log('[chat] frame', JSON.stringify(raw).slice(0, 500));
+    }
 
     if (cmd === Cmd.PING) {
       this.ws?.send(JSON.stringify(pongMessage()));
