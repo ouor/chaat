@@ -20,21 +20,13 @@ const POINTS: { icon: IconName; title: string; body: string }[] = [
   { icon: 'gear', title: '언제든 로그아웃할 수 있어요', body: '설정에서 로그아웃하면 이 폰에서 바로 지워져요.' },
 ];
 
-const POLL_JS = `(function(){ window.ReactNativeWebView.postMessage(document.cookie); })(); true;`;
+// The login WebView is a trust boundary: session cookies are read only from the native cookie
+// store (NID_AUT is HttpOnly, so page JS never sees it and nothing a page posts is trusted), and
+// top-level navigation is kept on https *.naver.com so no other page can sit inside the login screen.
+const NAVER_URL = /^https:\/\/([a-z0-9-]+\.)*naver\.com(?:[/:?#]|$)/i;
 
-function parseCookies(cookie: string): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const part of cookie.split(';')) {
-    const idx = part.indexOf('=');
-    if (idx > 0) out[part.slice(0, idx).trim()] = part.slice(idx + 1).trim();
-  }
-  return out;
-}
-
-function cookiesFromDocumentCookie(cookie: string): NaverCookies | null {
-  const parsed = parseCookies(cookie);
-  if (parsed.NID_AUT && parsed.NID_SES) return { aut: parsed.NID_AUT, ses: parsed.NID_SES };
-  return null;
+function hostOf(url: string): string {
+  return /^[a-z]+:\/\/([^/?#:]+)/i.exec(url)?.[1] ?? '';
 }
 
 export default function LoginScreen() {
@@ -46,23 +38,10 @@ export default function LoginScreen() {
   const [phase, setPhase] = useState<'idle' | 'webview' | 'fail'>('idle');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const webviewRef = useRef<WebView>(null);
+  const [host, setHost] = useState('nid.naver.com');
   const doneRef = useRef(false);
   // A ref, not the `busy` state: the 2s poll closure is created once and would only ever see busy=false.
   const busyRef = useRef(false);
-
-  useEffect(() => {
-    if (phase !== 'webview') return;
-    const t = setInterval(() => {
-      if (doneRef.current) return;
-      webviewRef.current?.injectJavaScript(POLL_JS);
-      void readNaverCookiesFromWebView().then((c) => {
-        if (c && !doneRef.current) void tryLogin(c);
-      });
-    }, 2000);
-    return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
 
   async function tryLogin(cookies: NaverCookies): Promise<void> {
     if (busyRef.current || doneRef.current) return;
@@ -79,10 +58,17 @@ export default function LoginScreen() {
     }
   }
 
-  function handleMessage(e: { nativeEvent: { data: string } }) {
-    const c = cookiesFromDocumentCookie(e.nativeEvent.data);
-    if (c) void tryLogin(c);
-  }
+  useEffect(() => {
+    if (phase !== 'webview') return;
+    const t = setInterval(() => {
+      if (doneRef.current) return;
+      void readNaverCookiesFromWebView().then((c) => {
+        if (c && !doneRef.current) void tryLogin(c);
+      });
+    }, 2000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   function startWebview() {
     doneRef.current = false;
@@ -111,7 +97,7 @@ export default function LoginScreen() {
             <Text style={[Type.heading, { color: theme.ink }]}>네이버 로그인</Text>
             <View style={[styles.domainPill, { backgroundColor: theme.canvasSoft }]}>
               <Icon name="lock" color={theme.mute} size={13} />
-              <Text style={[Type.micro, { color: theme.body }]}>nid.naver.com</Text>
+              <Text style={[Type.micro, { color: theme.body }]}>{host}</Text>
             </View>
           </View>
         </ScreenHeader>
@@ -159,12 +145,10 @@ export default function LoginScreen() {
       ) : (
         <View style={styles.webviewWrap}>
           <WebView
-            ref={webviewRef}
             source={{ uri: 'https://nid.naver.com/nidlogin.login' }}
-            onNavigationStateChange={(nav) => {
-              if (nav.url.includes('naver.com') && !doneRef.current) webviewRef.current?.injectJavaScript(POLL_JS);
-            }}
-            onMessage={handleMessage}
+            originWhitelist={['https://*']}
+            onShouldStartLoadWithRequest={(req) => !req.isTopFrame || NAVER_URL.test(req.url)}
+            onNavigationStateChange={(nav) => setHost(hostOf(nav.url))}
             onLoadEnd={() => setLoading(false)}
             style={styles.webview}
           />
