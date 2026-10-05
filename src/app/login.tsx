@@ -1,15 +1,24 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
-import { Icon } from '@/components/ui/icon';
-import { Radius, Spacing } from '@/constants/tokens';
+import { Button } from '@/components/ui/button';
+import { Icon, type IconName } from '@/components/ui/icon';
+import { ScreenHeader } from '@/components/ui/screen-header';
+import { Radius, Spacing, Type } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
 import { readNaverCookiesFromWebView } from '@/storage/cookie-reader';
 import type { NaverCookies } from '@/storage/keychain';
+
+// Reassurance for people wary of signing in through an app they don't know yet.
+const POINTS: { icon: IconName; title: string; body: string }[] = [
+  { icon: 'lock', title: '네이버 공식 화면에서 로그인해요', body: '위에 보이는 nid.naver.com이 네이버 로그인 주소예요.' },
+  { icon: 'phone', title: '비밀번호는 앱에 저장되지 않아요', body: '로그인 후 받은 정보만 이 폰의 보안 저장소에 보관해요.' },
+  { icon: 'gear', title: '언제든 로그아웃할 수 있어요', body: '설정에서 로그아웃하면 이 폰에서 바로 지워져요.' },
+];
 
 const POLL_JS = `(function(){ window.ReactNativeWebView.postMessage(document.cookie); })(); true;`;
 
@@ -31,6 +40,7 @@ function cookiesFromDocumentCookie(cookie: string): NaverCookies | null {
 export default function LoginScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { login } = useAuth();
 
   const [phase, setPhase] = useState<'idle' | 'webview' | 'fail'>('idle');
@@ -74,64 +84,71 @@ export default function LoginScreen() {
     if (c) void tryLogin(c);
   }
 
+  function startWebview() {
+    doneRef.current = false;
+    setLoading(true);
+    setPhase('webview');
+  }
+
   if (Platform.OS === 'web') {
     return (
-      <View style={[styles.root, { backgroundColor: theme.canvas, alignItems: 'center', justifyContent: 'center' }]}>
-        <Text style={{ color: theme.mute }}>Naver sign-in is not supported on web.</Text>
+      <View style={[styles.root, { backgroundColor: theme.canvas }]}>
+        <ScreenHeader title="로그인" />
+        <View style={styles.center}>
+          <Text style={[Type.label, { color: theme.mute }]}>웹에서는 네이버 로그인을 지원하지 않아요.</Text>
+        </View>
       </View>
     );
   }
 
   return (
     <View style={[styles.root, { backgroundColor: theme.canvas }]}>
-      <SafeAreaView edges={['top']} style={[styles.header, { borderBottomColor: theme.hairline }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={8}>
-          <Icon name="back" color={theme.body} />
-        </Pressable>
-        <View style={[styles.domainPill, { backgroundColor: theme.canvasSoft }]}>
-          <Text style={[styles.domainText, { color: theme.mute }]}>nid.naver.com</Text>
-        </View>
-      </SafeAreaView>
-
-      {phase === 'idle' ? (
-        <View style={styles.center}>
-          <View style={[styles.logo, { backgroundColor: theme.primary }]} />
-          <Text style={[styles.title, { color: theme.ink }]}>Sign in to chat</Text>
-          <Text style={[styles.hint, { color: theme.mute }]}>
-            Reading chat needs no account. Sending messages uses your Naver session.
-          </Text>
-          <Pressable
-            onPress={() => {
-              doneRef.current = false;
-              setLoading(true);
-              setPhase('webview');
-            }}
-            style={[styles.cta, { backgroundColor: theme.primary }]}>
-            <Text style={[styles.ctaText, { color: theme.onPrimary }]}>Continue with Naver</Text>
-          </Pressable>
-        </View>
-      ) : phase === 'fail' ? (
-        <View style={styles.center}>
-          <Text style={[styles.failLabel, { color: theme.danger }]}>SIGN-IN FAILED</Text>
-          <Text style={[styles.title, { color: theme.ink }]}>Session wasn&apos;t returned</Text>
-          <Text style={[styles.hint, { color: theme.mute }]}>
-            The sign-in window closed before we got a token. You can keep reading chat while signed out.
-          </Text>
-          <View style={styles.failButtons}>
-            <Pressable
-              onPress={() => {
-                doneRef.current = false;
-                setLoading(true);
-                setPhase('webview');
-              }}
-              style={[styles.cta, { backgroundColor: theme.primary }]}>
-              <Text style={[styles.ctaText, { color: theme.onPrimary }]}>Try again</Text>
-            </Pressable>
-            <Pressable onPress={() => router.back()} style={[styles.outlineButton, { borderColor: theme.hairline }]}>
-              <Text style={{ color: theme.ink, fontSize: 13, fontWeight: 600 }}>Read-only</Text>
-            </Pressable>
+      <ScreenHeader>
+        <View style={styles.headerMain}>
+          <View style={[styles.domainPill, { backgroundColor: theme.canvasSoft }]}>
+            <Icon name="lock" color={theme.mute} size={13} />
+            <Text style={[Type.micro, { color: theme.body }]}>nid.naver.com</Text>
           </View>
         </View>
+      </ScreenHeader>
+
+      {phase === 'idle' ? (
+        <>
+          <ScrollView contentContainerStyle={styles.intro}>
+            <Text style={[Type.hero, { color: theme.ink }]}>채팅을 보내려면{'\n'}네이버 로그인이 필요해요</Text>
+            <Text style={[Type.body, { color: theme.body }]}>채팅 보기는 로그인 없이도 할 수 있어요.</Text>
+            <View style={styles.points}>
+              {POINTS.map((p) => (
+                <View key={p.title} style={styles.point}>
+                  <View style={[styles.pointIcon, { backgroundColor: theme.canvasSoft }]}>
+                    <Icon name={p.icon} color={theme.ink} size={20} />
+                  </View>
+                  <View style={styles.pointText}>
+                    <Text style={[Type.bodyStrong, { color: theme.ink }]}>{p.title}</Text>
+                    <Text style={[Type.label, { color: theme.mute, fontWeight: 400 }]}>{p.body}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.lg) }]}>
+            <Button label="네이버로 로그인" size="lg" onPress={startWebview} />
+            <Button label="나중에 할게요" variant="secondary" size="lg" onPress={() => router.back()} />
+          </View>
+        </>
+      ) : phase === 'fail' ? (
+        <>
+          <View style={styles.center}>
+            <Text style={[Type.title, { color: theme.ink }]}>로그인을 마치지 못했어요</Text>
+            <Text style={[Type.label, styles.centerText, { color: theme.mute }]}>
+              로그인 창이 닫혔거나 로그인 정보를 받지 못했어요.{'\n'}로그인하지 않아도 채팅은 계속 볼 수 있어요.
+            </Text>
+          </View>
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.lg) }]}>
+            <Button label="다시 시도" size="lg" onPress={startWebview} />
+            <Button label="로그인 없이 보기" variant="secondary" size="lg" onPress={() => router.back()} />
+          </View>
+        </>
       ) : (
         <View style={styles.webviewWrap}>
           <WebView
@@ -147,8 +164,8 @@ export default function LoginScreen() {
           {loading || busy ? (
             <View style={[styles.overlay, { backgroundColor: theme.canvas }]}>
               <ActivityIndicator color={theme.primary} />
-              <Text style={[styles.overlayText, { color: theme.body }]}>
-                {busy ? 'Signing in…' : 'Opening Naver sign-in…'}
+              <Text style={[Type.label, { color: theme.body }]}>
+                {busy ? '로그인하는 중…' : '네이버 로그인 화면을 여는 중…'}
               </Text>
             </View>
           ) : null}
@@ -160,42 +177,23 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  header: {
+  headerMain: { flex: 1, flexDirection: 'row' },
+  domainPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
+    gap: 5,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: 1,
+    paddingVertical: 6,
+    borderRadius: Radius.pill,
   },
-  backButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  domainPill: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 3,
-    borderRadius: Radius.xs,
-  },
-  domainText: { fontSize: 11, fontFamily: 'monospace' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: Spacing.xxxl },
-  logo: { width: 11, height: 20, borderRadius: 1, transform: [{ skewX: '-12deg' }] },
-  title: { fontSize: 18, fontWeight: 600, letterSpacing: -0.3 },
-  hint: { fontSize: 12.5, lineHeight: 20, textAlign: 'center' },
-  cta: {
-    marginTop: 8,
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: 12,
-    borderRadius: Radius.sm,
-    alignItems: 'center',
-  },
-  ctaText: { fontSize: 15, fontWeight: 600 },
-  failLabel: { fontSize: 10, letterSpacing: 1.6, fontFamily: 'monospace' },
-  failButtons: { flexDirection: 'row', gap: Spacing.sm, marginTop: 4 },
-  outlineButton: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: 9,
-    borderRadius: Radius.sm,
-    borderWidth: 1,
-    justifyContent: 'center',
-  },
+  intro: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.xxl, gap: Spacing.md },
+  points: { marginTop: Spacing.xxl, gap: Spacing.xl },
+  point: { flexDirection: 'row', gap: Spacing.lg, alignItems: 'flex-start' },
+  pointIcon: { width: 44, height: 44, borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center' },
+  pointText: { flex: 1, gap: 2 },
+  footer: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md, gap: Spacing.sm },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md, paddingHorizontal: Spacing.xxl },
+  centerText: { textAlign: 'center', fontWeight: 400 },
   webviewWrap: { flex: 1 },
   webview: { flex: 1 },
   overlay: {
@@ -208,5 +206,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 12,
   },
-  overlayText: { fontSize: 13.5 },
 });
