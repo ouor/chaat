@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type PropsWithChildren } from 'react';
 
 import { getUserStatus } from '@/client/chzzk/rest';
+import { clearWebViewCookies } from '@/storage/cookie-reader';
 import { clearNaverCookies, loadNaverCookies, saveNaverCookies, type NaverCookies } from '@/storage/keychain';
 
 interface AuthState {
@@ -55,7 +56,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   const logout = useCallback(async (): Promise<void> => {
-    await clearNaverCookies();
+    await Promise.all([clearNaverCookies(), clearWebViewCookies()]);
     setState({ loggedIn: false });
   }, []);
 

@@ -14,6 +14,7 @@ interface CookieValue {
 // export — so type it against the real runtime shape.
 interface CookieManagerLike {
   get(url: string, useWebKit?: boolean): Promise<Record<string, CookieValue>>;
+  clearAll(useWebKit?: boolean): Promise<boolean>;
 }
 
 let cookieManager: CookieManagerLike | null = null;
@@ -35,4 +36,15 @@ export async function readNaverCookiesFromWebView(): Promise<NaverCookies | null
     return null;
   }
   return null;
+}
+
+// The login WebView's cookie store is also the native HTTP/WebSocket cookie jar on Android,
+// so logout must wipe it or NID_AUT/NID_SES keep riding along on every *.naver.com request.
+export async function clearWebViewCookies(): Promise<void> {
+  if (!cookieManager) return;
+  try {
+    await cookieManager.clearAll();
+  } catch {
+    // nothing stored / module unavailable
+  }
 }

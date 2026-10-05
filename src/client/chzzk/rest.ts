@@ -37,6 +37,10 @@ async function request<T>(
 ): Promise<T> {
   const res = await fetch(base + path + qs(opts.params ?? {}), {
     method: opts.method ?? 'GET',
+    // Keep the shared native cookie jar (= login WebView store on Android) out of API calls:
+    // with credentials, RN Android attaches the jar's NID cookies even when we pass none
+    // (and OkHttp's jar header can win over ours). The explicit header below is the only auth.
+    credentials: 'omit',
     headers: {
       'User-Agent': UA,
       Accept: 'application/json',
