@@ -166,8 +166,8 @@ export default function ChatScreen() {
   function handleSend() {
     const text = draft.trim();
     if (!text) return;
-    sendChat(text);
-    setDraft('');
+    // Keep the draft when the socket is between connections instead of silently dropping it.
+    if (sendChat(text)) setDraft('');
   }
 
   function handleMention() {

@@ -31,7 +31,7 @@ export interface MockChatSession {
   canModerate: boolean;
   emojiMap: Record<string, string>;
   profileImages: Record<string, string>;
-  sendChat: () => void;
+  sendChat: (text: string) => boolean;
   retry: () => void;
 }
 
@@ -73,7 +73,7 @@ export function useMockChatSession(enabled: boolean, ended = false): MockChatSes
     canModerate: false,
     emojiMap: {},
     profileImages: {},
-    sendChat: () => undefined,
+    sendChat: () => true,
     retry: () => undefined,
   };
 }

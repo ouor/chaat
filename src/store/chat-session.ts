@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
 import { getAccessToken, getLiveStatus, getProfileCard } from '@/client/chzzk/rest';
 import { ChatSocket, type ConnState } from '@/client/chzzk/socket';
@@ -31,7 +32,8 @@ export interface ChatSession {
   canModerate: boolean;
   emojiMap: Record<string, string>;
   profileImages: Record<string, string>;
-  sendChat: (text: string) => void;
+  /** False when not connected; the caller should keep the draft. */
+  sendChat: (text: string) => boolean;
   retry: () => void;
 }
 
@@ -131,6 +133,7 @@ export function useChatSession(
         });
         socketRef.current = socket;
         socket.connect();
+        if (AppState.currentState !== 'active') socket.setForeground(false);
       } catch {
         if (!cancelled) setConnState('offline');
       }
@@ -146,8 +149,14 @@ export function useChatSession(
     };
   }, [channelId, auth.cookie, auth.uid, attempt]);
 
-  const sendChat = useCallback((text: string) => {
-    socketRef.current?.sendChat(text);
+  // Doze and network switches leave half-open sockets; let the socket re-check on return to foreground.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => socketRef.current?.setForeground(s === 'active'));
+    return () => sub.remove();
+  }, []);
+
+  const sendChat = useCallback((text: string): boolean => {
+    return socketRef.current?.sendChat(text) ?? false;
   }, []);
 
   const retry = useCallback(() => setAttempt((a) => a + 1), []);
