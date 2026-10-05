@@ -16,12 +16,28 @@ export interface FavoriteChannel {
 let cache: FavoriteChannel[] | null = null;
 const listeners = new Set<() => void>();
 
+// Stored JSON is untrusted (older app versions, API nulls such as a missing channel image):
+// keep every entry that has a channel id and fill the rest, so no favorite is silently dropped.
+function toFavorite(v: unknown): FavoriteChannel[] {
+  if (typeof v !== 'object' || v === null) return [];
+  const f = v as Record<string, unknown>;
+  if (typeof f.channelId !== 'string' || !f.channelId) return [];
+  return [
+    {
+      channelId: f.channelId,
+      channelName: typeof f.channelName === 'string' ? f.channelName : f.channelId,
+      channelImageUrl: typeof f.channelImageUrl === 'string' ? f.channelImageUrl : '',
+      addedAt: typeof f.addedAt === 'number' ? f.addedAt : 0,
+    },
+  ];
+}
+
 function read(): FavoriteChannel[] {
   if (cache) return cache;
   try {
     const raw = kv.getString(KEY);
     const parsed: unknown = raw ? JSON.parse(raw) : [];
-    cache = Array.isArray(parsed) ? (parsed as FavoriteChannel[]) : [];
+    cache = Array.isArray(parsed) ? parsed.flatMap(toFavorite) : [];
   } catch {
     cache = [];
   }

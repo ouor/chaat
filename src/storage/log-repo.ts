@@ -77,15 +77,6 @@ export function markLogBlinded(channelId: string, e: BlindEvent): void {
   }).catch(() => undefined);
 }
 
-export function stopLogging(): void {
-  if (timer) {
-    clearInterval(timer);
-    timer = null;
-  }
-  appStateSub?.remove();
-  appStateSub = null;
-}
-
 // Single flusher: a slow write must not overlap the next tick's transaction on the same connection.
 function flush(): Promise<void> {
   flushing ??= serialWrite(writeBuffered).finally(() => {
