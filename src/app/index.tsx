@@ -14,7 +14,7 @@ import { useFavorites, type FavoriteChannel } from '@/store/favorites';
 export default function HomeScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const { favorites } = useFavorites();
+  const favorites = useFavorites();
   const [liveMap, setLiveMap] = useState<Record<string, { open: boolean; viewers: number }>>({});
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);

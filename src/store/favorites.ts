@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 import { kv } from '@/storage/kv';
 
@@ -11,19 +11,27 @@ export interface FavoriteChannel {
   addedAt: number;
 }
 
+// One cached snapshot shared by every screen: a per-hook useState copy went stale on the
+// home screen (it stays mounted under the stack) after toggling a favorite elsewhere.
+let cache: FavoriteChannel[] | null = null;
+const listeners = new Set<() => void>();
+
 function read(): FavoriteChannel[] {
+  if (cache) return cache;
   try {
     const raw = kv.getString(KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as FavoriteChannel[]) : [];
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    cache = Array.isArray(parsed) ? (parsed as FavoriteChannel[]) : [];
   } catch {
-    return [];
+    cache = [];
   }
+  return cache;
 }
 
 function write(list: FavoriteChannel[]): void {
   kv.setString(KEY, JSON.stringify(list));
+  cache = null;
+  for (const l of listeners) l();
 }
 
 export function isFavorite(channelId: string): boolean {
@@ -43,10 +51,13 @@ export function toggleFavorite(
   return true;
 }
 
-export function useFavorites() {
-  const [favorites, setFavorites] = useState<FavoriteChannel[]>(read);
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
 
-  const refresh = useCallback(() => setFavorites(read()), []);
-
-  return { favorites, refresh };
+export function useFavorites(): FavoriteChannel[] {
+  return useSyncExternalStore(subscribe, read);
 }

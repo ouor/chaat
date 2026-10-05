@@ -22,7 +22,7 @@ function formatFollowers(n: number): string {
 export default function SearchScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const { favorites, refresh } = useFavorites();
+  const favorites = useFavorites();
 
   const [q, setQ] = useState('');
   const [results, setResults] = useState<SearchChannel[]>([]);
@@ -139,7 +139,6 @@ export default function SearchScreen() {
                 <Pressable
                   onPress={() => {
                     toggleFavorite({ channelId: ch.channelId, channelName: ch.channelName, channelImageUrl: ch.channelImageUrl });
-                    refresh();
                   }}
                   style={styles.starButton}
                   hitSlop={8}>
