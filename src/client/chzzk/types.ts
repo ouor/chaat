@@ -56,6 +56,8 @@ export interface ChatMessage {
   msgTime: number;
   extras: Record<string, unknown>;
   donationAmount?: number;
+  /** Set when a moderator / the clean bot blinded this message after it arrived. */
+  blinded?: boolean;
   /** Sender's own emoji id -> image URL (subscription emojis aren't in the channel pack list). */
   emojis?: Record<string, string>;
 }

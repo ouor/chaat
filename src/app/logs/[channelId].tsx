@@ -2,7 +2,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { ANONYMOUS_DONOR } from '@/components/chat/chat-row';
+import { ANONYMOUS_DONOR, BLINDED_TEXT } from '@/components/chat/chat-row';
 import { EmojiText } from '@/components/chat/emoji-text';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
@@ -170,13 +170,17 @@ export default function LogsScreen() {
                       {item.row.nickname || (item.row.type === 'donation' ? ANONYMOUS_DONOR : '익명')}
                     </Text>
                   </View>
-                  <EmojiText
-                    text={item.row.message}
-                    emojiMap={emojiMap}
-                    messageEmojis={item.row.emojis}
-                    fontSize={Type.body.fontSize}
-                    color={theme.ink}
-                  />
+                  {item.row.type === 'blinded' ? (
+                    <Text style={[Type.body, { color: theme.mute }]}>{BLINDED_TEXT}</Text>
+                  ) : (
+                    <EmojiText
+                      text={item.row.message}
+                      emojiMap={emojiMap}
+                      messageEmojis={item.row.emojis}
+                      fontSize={Type.body.fontSize}
+                      color={theme.ink}
+                    />
+                  )}
                 </View>
               </View>
             )

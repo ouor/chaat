@@ -1,6 +1,8 @@
 import {
+  type BlindEvent,
   Cmd,
   connectMessage,
+  parseBlind,
   parseChatMessages,
   parseRecentChat,
   pingMessage,
@@ -26,6 +28,7 @@ export interface ChatSocketOptions {
   uid?: string;
   onMessage: (m: ChatMessage) => void;
   onNotice?: (text: string) => void;
+  onBlind?: (e: BlindEvent) => void;
   onConnected?: () => void;
   onStateChange?: (s: ConnState) => void;
 }
@@ -197,6 +200,11 @@ export class ChatSocket {
       this.setState('connected');
       this.opts.onConnected?.();
       this.requestRecent(50);
+    }
+    if (cmd === Cmd.BLIND) {
+      const blind = parseBlind(raw);
+      if (blind) this.opts.onBlind?.(blind);
+      return;
     }
     if (cmd === Cmd.NOTICE) {
       for (const m of parseChatMessages(raw)) {

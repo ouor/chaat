@@ -22,6 +22,7 @@ function nickKey(hash: string): (typeof NICKS)[number] {
 
 /** The official app's wording for donations sent without a nickname. */
 export const ANONYMOUS_DONOR = '익명의 후원자';
+export const BLINDED_TEXT = '가려진 메시지예요';
 
 function fmtTime(t: number): string {
   const d = new Date(t);
@@ -100,6 +101,11 @@ export const ChatRow = memo(function ChatRow({
   const nickStyle = { color: theme[nickKey(m.userIdHash || m.nickname)], fontSize: font - 1, lineHeight: font + 6 };
 
   const pressableProps = onPress ? { onPress: () => onPress(m) } : {};
+  const body = m.blinded ? (
+    <Text style={{ color: theme.mute, fontSize: font, lineHeight: font + 6 }}>{BLINDED_TEXT}</Text>
+  ) : (
+    <EmojiText text={m.message} emojiMap={emojis} messageEmojis={m.emojis} fontSize={font} color={theme.ink} />
+  );
 
   if (m.msgType === 'system') {
     return <Text style={[Type.caption, styles.system, { color: theme.mute }]}>{m.message}</Text>;
@@ -124,9 +130,7 @@ export const ChatRow = memo(function ChatRow({
             </Text>
           ) : null}
         </View>
-        {m.message ? (
-          <EmojiText text={m.message} emojiMap={emojis} messageEmojis={m.emojis} fontSize={font} color={theme.ink} />
-        ) : null}
+        {m.message || m.blinded ? body : null}
       </Pressable>
     );
   }
@@ -137,7 +141,7 @@ export const ChatRow = memo(function ChatRow({
         <View style={[styles.badge, { backgroundColor: theme.canvasSoft2 }]}>
           <Text style={[Type.badge, { color: theme.ink }]}>구독</Text>
         </View>
-        <Text style={[styles.subText, { color: theme.body, fontSize: font - 1, lineHeight: font + 6 }]}>{m.message}</Text>
+        <Text style={[styles.subText, { color: theme.body, fontSize: font - 1, lineHeight: font + 6 }]}>{m.blinded ? BLINDED_TEXT : m.message}</Text>
       </View>
     );
   }
@@ -154,7 +158,7 @@ export const ChatRow = memo(function ChatRow({
             </Text>
             {showTime ? <Text style={[Type.micro, { color: theme.mute }]}>{fmtTime(m.msgTime)}</Text> : null}
           </View>
-          <EmojiText text={m.message} emojiMap={emojis} messageEmojis={m.emojis} fontSize={font} color={theme.ink} />
+          {body}
         </View>
       </Pressable>
     );
@@ -176,7 +180,7 @@ export const ChatRow = memo(function ChatRow({
         {m.nickname}
       </Text>
       <View style={styles.message}>
-        <EmojiText text={m.message} emojiMap={emojis} messageEmojis={m.emojis} fontSize={font} color={theme.ink} />
+        {body}
       </View>
     </Pressable>
   );

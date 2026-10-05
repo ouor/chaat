@@ -5,7 +5,7 @@ import { getAccessToken, getLiveStatus } from '@/client/chzzk/rest';
 import { ChatSocket, type ConnState } from '@/client/chzzk/socket';
 import type { ChatMessage } from '@/client/chzzk/types';
 import { useEmojiMap } from '@/store/emoji-map';
-import { enqueueLog } from '@/storage/log-repo';
+import { enqueueLog, markLogBlinded } from '@/storage/log-repo';
 
 const MAX_MESSAGES = 500;
 // While the user is scrolled up reading, trimming the oldest rows would delete what they're
@@ -109,6 +109,12 @@ export function useChatSession(
             enqueueLog(channelId, m);
             pending.push(m);
             commitTimer ??= setTimeout(commit, COMMIT_MS);
+          },
+          onBlind: (e) => {
+            const hit = (m: ChatMessage) => m.msgTime === e.messageTime && m.userIdHash === e.userIdHash;
+            pending = pending.map((m) => (hit(m) ? { ...m, blinded: true } : m));
+            setMessages((prev) => (prev.some(hit) ? prev.map((m) => (hit(m) ? { ...m, blinded: true } : m)) : prev));
+            markLogBlinded(channelId, e);
           },
           onNotice: (text) => setNotice(text),
           onStateChange: setConnState,

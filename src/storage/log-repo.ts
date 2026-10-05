@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { AppState, Platform, type NativeEventSubscription } from 'react-native';
 
-import { parseExtrasEmojis } from '@/client/chzzk/protocol';
+import { type BlindEvent, parseExtrasEmojis } from '@/client/chzzk/protocol';
 import type { ChatMessage } from '@/client/chzzk/types';
 
 import { getDb } from './db';
@@ -54,6 +54,29 @@ export function enqueueLog(channelId: string, m: ChatMessage): void {
   startTimer();
 }
 
+/**
+ * A blinded message must not survive in the archive: blank it whether it is still buffered or
+ * already written (the UPDATE is queued behind any in-flight flush by the write chain).
+ */
+export function markLogBlinded(channelId: string, e: BlindEvent): void {
+  for (const b of buffer) {
+    if (b.channelId === channelId && b.m.msgTime === e.messageTime && b.m.userIdHash === e.userIdHash) {
+      b.m = { ...b.m, blinded: true };
+    }
+  }
+  void serialWrite(async () => {
+    const db = await getDb();
+    await inWriteTransaction(db, async (conn) => {
+      await conn.runAsync(
+        "UPDATE OR IGNORE messages SET message = '', type = 'blinded', extras_json = NULL WHERE channel_id = ? AND msg_time = ? AND user_id_hash = ?",
+        channelId,
+        e.messageTime,
+        e.userIdHash,
+      );
+    });
+  }).catch(() => undefined);
+}
+
 export function stopLogging(): void {
   if (timer) {
     clearInterval(timer);
@@ -87,10 +110,10 @@ async function writeBuffered(): Promise<void> {
             m.chatChannelId,
             m.userIdHash,
             m.nickname,
-            m.message,
-            m.msgType,
+            m.blinded ? '' : m.message,
+            m.blinded ? 'blinded' : m.msgType,
             m.msgTime,
-            JSON.stringify(m.extras),
+            m.blinded ? null : JSON.stringify(m.extras),
             Date.now(),
           ]);
         }

@@ -244,6 +244,21 @@ export function parseChatMessages(raw: unknown): ChatMessage[] {
   return m ? [m] : [];
 }
 
+/** A message hidden after it was sent; identifies it by sender + send time. */
+export interface BlindEvent {
+  messageTime: number;
+  userIdHash: string;
+}
+
+// Shape verified against a live 94008 frame:
+// {"cmd":94008,"bdy":{"messageTime":<ms>,"blindType":"BLIND","blindUserId":null,"message":null,"userId":"<hash>",...}}
+export function parseBlind(raw: unknown): BlindEvent | null {
+  if (!isRecord(raw) || raw.cmd !== Cmd.BLIND || !isRecord(raw.bdy)) return null;
+  const { messageTime, userId } = raw.bdy;
+  if (typeof messageTime !== 'number' || typeof userId !== 'string' || !userId) return null;
+  return { messageTime, userIdHash: userId };
+}
+
 export function parseRecentChat(raw: unknown): ChatMessage[] {
   if (!isRecord(raw) || raw.cmd !== Cmd.RECENT_CHAT || typeof raw.cid !== 'string') return [];
   const cid = raw.cid;
@@ -394,6 +409,17 @@ export function selfCheck(): void {
   });
   assert(recent.length === 2 && recent[1].message === 'two', 'recent parse');
   assert(recent[0].msgTime === 1700000001000 && recent[1].userIdHash === 'b', 'recent field names');
+
+  const blind = parseBlind({
+    svcid: 'game',
+    ver: '1',
+    bdy: { messageTime: 1791173111049, blindType: 'BLIND', blindUserId: null, serviceId: 'game', message: null, userId: 'u9', channelId: 'abc' },
+    cmd: Cmd.BLIND,
+    tid: null,
+    cid: 'abc',
+  });
+  assert(blind?.messageTime === 1791173111049 && blind.userIdHash === 'u9', 'blind parse');
+  assert(parseBlind({ cmd: Cmd.BLIND, bdy: { messageTime: 1 } }) === null, 'blind without user ignored');
 
   const send = sendChatMessage(
     'abc',
