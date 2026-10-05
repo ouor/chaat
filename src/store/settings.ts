@@ -18,7 +18,7 @@ const DEFAULTS: Settings = {
   theme: 'dark',
   fontScale: 'md',
   retentionDays: 30,
-  chatVariant: 'compact',
+  chatVariant: 'card',
 };
 const KEY = 'settings';
 

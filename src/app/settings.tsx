@@ -120,8 +120,8 @@ export default function SettingsScreen() {
           <Field label="채팅 모양">
             <Segmented<ChatVariant>
               options={[
-                { label: '한 줄로 촘촘하게', value: 'compact' },
                 { label: '두 줄로 넉넉하게', value: 'card' },
+                { label: '한 줄로 촘촘하게', value: 'compact' },
               ]}
               value={settings.chatVariant}
               onSelect={(v) => updateSettings({ chatVariant: v })}

@@ -148,11 +148,13 @@ export const ChatRow = memo(function ChatRow({
     );
   }
 
+  // One-line layout is the dense, text-only mode: no avatars, and the time (ended streams only)
+  // leads the row as a quiet fixed column instead of a ragged right edge.
   return (
     <Pressable {...pressableProps} style={styles.chatRow}>
-      <View style={[styles.thumbSlot, { height: font + 6 }]}>
-        <ProfileThumb uri={profileImage} name={m.nickname} size={20} />
-      </View>
+      {showTime ? (
+        <Text style={[Type.micro, styles.time, { color: theme.mute, lineHeight: font + 6 }]}>{fmtTime(m.msgTime)}</Text>
+      ) : null}
       {m.role !== 'member' ? (
         <View style={[styles.thumbSlot, { height: font + 6 }]}>
           <RoleBadge role={m.role} />
@@ -164,9 +166,6 @@ export const ChatRow = memo(function ChatRow({
       <View style={styles.message}>
         <EmojiText text={m.message} emojiMap={emojis} messageEmojis={m.emojis} fontSize={font} color={theme.ink} />
       </View>
-      {showTime ? (
-        <Text style={[Type.micro, styles.time, { color: theme.mute, lineHeight: font + 6 }]}>{fmtTime(m.msgTime)}</Text>
-      ) : null}
     </Pressable>
   );
 });
@@ -176,7 +175,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 6,
-    paddingVertical: 4,
+    paddingVertical: 3,
     paddingHorizontal: Spacing.lg,
   },
   thumbSlot: { justifyContent: 'center' },
@@ -194,7 +193,7 @@ const styles = StyleSheet.create({
     maxWidth: '38%',
   },
   message: { flex: 1, minWidth: 0 },
-  time: { flexShrink: 0 },
+  time: { width: 36, flexShrink: 0, fontVariant: ['tabular-nums'] },
   badge: {
     borderRadius: Radius.xs,
     paddingHorizontal: 5,
