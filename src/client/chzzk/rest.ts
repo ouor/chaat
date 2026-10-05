@@ -58,6 +58,16 @@ async function request<T>(
   return body.content;
 }
 
+// Path segments come from deep links (chaat://chat/<id>) and server frames. Encode every one, and
+// require the channel id shape before any request (some of these carry the user's cookie), so a
+// crafted id can't steer an authenticated request to another API path.
+const CHANNEL_ID = /^[0-9a-f]{32}$/;
+
+function channelPath(channelId: string): string {
+  if (!CHANNEL_ID.test(channelId)) throw new ChzzkApiError('invalid channel id', 400);
+  return encodeURIComponent(channelId);
+}
+
 // Image URLs from REST go straight into <Image>; keep them on the CHZZK CDN like WS-sourced ones.
 function trustedChannel(c: ChannelDetail): ChannelDetail {
   return isTrustedImageUrl(c.channelImageUrl) ? c : { ...c, channelImageUrl: '' };
@@ -86,17 +96,17 @@ export function searchChannels(
   }));
 }
 
-export function getLiveStatus(channelId: string): Promise<LiveStatus> {
-  return get<LiveStatus>(SERVICE_BASE, `/polling/v2/channels/${channelId}/live-status`, {}).then((c) => ({
+export async function getLiveStatus(channelId: string): Promise<LiveStatus> {
+  return get<LiveStatus>(SERVICE_BASE, `/polling/v2/channels/${channelPath(channelId)}/live-status`, {}).then((c) => ({
     ...c,
     // Validated here so nothing downstream opens a socket for a null/empty chat room id.
     chatChannelId: typeof c.chatChannelId === 'string' && c.chatChannelId.length > 0 ? c.chatChannelId : null,
   }));
 }
 
-export function getChannel(channelId: string): Promise<ChannelDetail> {
+export async function getChannel(channelId: string): Promise<ChannelDetail> {
   // content IS the channel (verified against a raw response), not wrapped in { channel }.
-  return get<ChannelDetail>(SERVICE_BASE, `/service/v1/channels/${channelId}`, {}).then(trustedChannel);
+  return get<ChannelDetail>(SERVICE_BASE, `/service/v1/channels/${channelPath(channelId)}`, {}).then(trustedChannel);
 }
 
 export function getAccessToken(chatChannelId: string, cookie?: string): Promise<AccessToken> {
@@ -158,7 +168,7 @@ export interface ProfileCard {
 export function getProfileCard(chatChannelId: string, userIdHash: string, cookie?: string): Promise<ProfileCard> {
   return get<ProfileCard>(
     GAME_BASE,
-    `/v1/chats/${chatChannelId}/users/${userIdHash}/profile-card`,
+    `/v1/chats/${encodeURIComponent(chatChannelId)}/users/${encodeURIComponent(userIdHash)}/profile-card`,
     { chatType: 'STREAMING' },
     cookie,
   ).then((pc) => (isTrustedImageUrl(pc.profileImageUrl) ? pc : { ...pc, profileImageUrl: null }));
@@ -179,8 +189,8 @@ interface EmojiPacksContent {
   subscriptionEmojiPacks?: EmojiPack[];
 }
 
-export function getEmojiPacks(channelId: string, cookie?: string): Promise<{ emojiId: string; imageUrl: string }[]> {
-  return get<EmojiPacksContent>(SERVICE_BASE, `/service/v1/channels/${channelId}/emoji-packs`, {}, cookie).then((c) => {
+export async function getEmojiPacks(channelId: string, cookie?: string): Promise<{ emojiId: string; imageUrl: string }[]> {
+  return get<EmojiPacksContent>(SERVICE_BASE, `/service/v1/channels/${channelPath(channelId)}/emoji-packs`, {}, cookie).then((c) => {
     const all = [...c.emojiPacks, ...(c.cheatKeyEmojiPacks ?? []), ...(c.subscriptionEmojiPacks ?? [])];
     return all
       .flatMap((p) => [...p.emojis, ...(p.tier1Emojis ?? []), ...(p.tier2Emojis ?? [])])
