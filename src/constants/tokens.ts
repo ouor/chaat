@@ -35,9 +35,9 @@ export const Colors = {
     primarySoft: '#0a8f61',
     primaryDeep: '#0a8f61',
     primaryTint: 'rgba(16, 185, 129, 0.10)',
-    onPrimary: '#ffffff',
+    onPrimary: '#101010',
     danger: '#e5383b',
-    favorite: '#f5a700',
+    favorite: '#e39a00',
     scrim: 'rgba(0, 0, 0, 0.4)',
   },
 } as const;
