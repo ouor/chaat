@@ -1,24 +1,26 @@
-import '@/global.css';
-
-import { Platform } from 'react-native';
+import type { TextStyle } from 'react-native';
 
 export type Theme = 'dark' | 'light';
 
+// Neutral, low-chroma surfaces; the green accent is reserved for CTA / LIVE / donation.
 export const Colors = {
   dark: {
     canvas: '#101010',
-    canvasSoft: '#1a1a1a',
-    canvasSoft2: '#232323',
-    hairline: '#3d3a39',
+    canvasSoft: '#1c1c1e',
+    canvasSoft2: '#2c2c2e',
+    hairline: '#2a2a2c',
     ink: '#f2f2f2',
     inkStrong: '#ffffff',
-    body: '#bdbdbd',
-    mute: '#8b949e',
+    body: '#c9cdd2',
+    mute: '#9ea4ab',
     primary: '#00d992',
     primarySoft: '#2fd6a1',
     primaryDeep: '#10b981',
+    primaryTint: 'rgba(0, 217, 146, 0.10)',
     onPrimary: '#101010',
-    danger: '#e5534b',
+    danger: '#f0625a',
+    favorite: '#ffc94d',
+    scrim: 'rgba(0, 0, 0, 0.55)',
     nick1: '#00d992',
     nick2: '#5fd0b4',
     nick3: '#a9b8b2',
@@ -28,18 +30,21 @@ export const Colors = {
   },
   light: {
     canvas: '#ffffff',
-    canvasSoft: '#f5f6f7',
-    canvasSoft2: '#ebecee',
-    hairline: '#e0ddda',
-    ink: '#101010',
+    canvasSoft: '#f2f4f6',
+    canvasSoft2: '#e5e8eb',
+    hairline: '#eceef1',
+    ink: '#191f28',
     inkStrong: '#000000',
-    body: '#4b4b4b',
-    mute: '#767c85',
+    body: '#4e5968',
+    mute: '#6b7684',
     primary: '#10b981',
-    primarySoft: '#0ea371',
+    primarySoft: '#0a8f61',
     primaryDeep: '#0a8f61',
+    primaryTint: 'rgba(16, 185, 129, 0.10)',
     onPrimary: '#ffffff',
-    danger: '#d1362c',
+    danger: '#e5383b',
+    favorite: '#f5a700',
+    scrim: 'rgba(0, 0, 0, 0.4)',
     nick1: '#0a8f61',
     nick2: '#166e59',
     nick3: '#4b5a55',
@@ -70,20 +75,24 @@ export const Radius = {
   xs: 4,
   sm: 6,
   md: 8,
+  lg: 12,
+  xl: 16,
   pill: 9999,
 } as const;
 
-export const Fonts = Platform.select({
-  ios: {
-    sans: 'system-ui',
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: 'var(--font-display)',
-    mono: 'var(--font-mono)',
-  },
-});
+/** Minimum touch target (dp) for any tappable control. */
+export const TOUCH = 44;
+
+// One system sans scale for every label, count and button — no monospace in the UI.
+// Smallest readable text is 12; anything that carries meaning should be 13+.
+export const Type = {
+  hero: { fontSize: 26, lineHeight: 35, fontWeight: 700, letterSpacing: -0.6 },
+  title: { fontSize: 20, lineHeight: 28, fontWeight: 700, letterSpacing: -0.4 },
+  heading: { fontSize: 17, lineHeight: 24, fontWeight: 700, letterSpacing: -0.3 },
+  bodyStrong: { fontSize: 16, lineHeight: 23, fontWeight: 600, letterSpacing: -0.2 },
+  body: { fontSize: 15, lineHeight: 22, fontWeight: 400 },
+  label: { fontSize: 14, lineHeight: 20, fontWeight: 500 },
+  caption: { fontSize: 13, lineHeight: 18, fontWeight: 400 },
+  micro: { fontSize: 12, lineHeight: 16, fontWeight: 500 },
+  badge: { fontSize: 11, lineHeight: 14, fontWeight: 700 },
+} as const satisfies Record<string, TextStyle>;
