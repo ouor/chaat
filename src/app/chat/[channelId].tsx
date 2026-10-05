@@ -58,7 +58,8 @@ export default function ChatScreen() {
   useKeepAwake();
   const { loggedIn, cookie, uid } = useAuth();
   const favorites = useFavorites();
-  const isMock = channelId === 'mock';
+  // Dev-only preview room (web/DOM checks); release builds treat 'mock' as an invalid channel.
+  const isMock = __DEV__ && channelId === 'mock';
   const real = useChatSession(channelId, { cookie, uid });
   const mock = useMockChatSession(isMock, ended === '1');
   const { connState, liveStatus, messages, notice, chatChannelId, streamingChannelId, canModerate, emojiMap, sendChat, retry, setReading } =
