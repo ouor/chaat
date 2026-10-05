@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -22,6 +22,10 @@ const CONN_META: Record<string, { label: string; color: 'primarySoft' | 'mute' |
   reconnecting: { label: 'Reconnecting…', color: 'mute' },
   offline: { label: 'Disconnected', color: 'danger' },
 };
+
+function chatKey(m: ChatMessage): string {
+  return `${m.msgTime}:${m.userIdHash}:${m.message}`;
+}
 
 const ROLE_LABEL: Record<ChatMessage['role'], string> = {
   streamer: 'CHANNEL OWNER',
@@ -114,6 +118,19 @@ export default function ChatScreen() {
   const conn = CONN_META[connState] ?? CONN_META.connecting;
   const isLive = liveStatus === 'OPEN';
   const isEnded = liveStatus === 'CLOSE';
+
+  const renderItem = useCallback(
+    ({ item }: { item: ChatMessage }) => (
+      <ChatRow
+        m={item}
+        showTime={isEnded}
+        emojiMap={emojiMap}
+        profileImage={profileImages[item.userIdHash]}
+        onPress={setSelected}
+      />
+    ),
+    [isEnded, emojiMap, profileImages],
+  );
 
   function handleSend() {
     const text = draft.trim();
@@ -237,16 +254,10 @@ export default function ChatScreen() {
           ref={listRef}
           inverted
           data={data}
-          keyExtractor={(item, index) => `${item.userIdHash}:${item.msgTime}:${index}`}
-          renderItem={({ item }) => (
-            <ChatRow
-              m={item}
-              showTime={isEnded}
-              emojiMap={emojiMap}
-              profileImages={profileImages}
-              onPress={() => setSelected(item)}
-            />
-          )}
+          // Content-based key (same identity as the store dedup): an index key would shift on every
+          // new message in this reversed list and remount every visible row.
+          keyExtractor={chatKey}
+          renderItem={renderItem}
           onScroll={onScroll}
           scrollEventThrottle={16}
           style={{ flex: 1, backgroundColor: isEnded ? theme.canvasSoft : theme.canvas }}

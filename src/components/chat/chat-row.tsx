@@ -77,13 +77,15 @@ export const ChatRow = memo(function ChatRow({
   showTime,
   onPress,
   emojiMap,
-  profileImages,
+  profileImage: backfilledImage,
 }: {
   m: ChatMessage;
   showTime: boolean;
-  onPress?: () => void;
+  // Takes the message so the list can pass one stable callback and keep memo intact.
+  onPress?: (m: ChatMessage) => void;
   emojiMap?: Record<string, string>;
-  profileImages?: Record<string, string>;
+  /** Backfilled image for this row's user only, so one user's backfill doesn't re-render every row. */
+  profileImage?: string;
 }) {
   const theme = useTheme();
   const { fontScale, chatVariant } = useSettings();
@@ -91,9 +93,9 @@ export const ChatRow = memo(function ChatRow({
   const isCard = chatVariant === 'card';
   const nickColor = theme[nickKey(m.userIdHash)];
   const emojis = emojiMap ?? {};
-  const profileImage = m.profileImageUrl || profileImages?.[m.userIdHash];
+  const profileImage = m.profileImageUrl || backfilledImage;
 
-  const pressableProps = onPress ? { onPress } : {};
+  const pressableProps = onPress ? { onPress: () => onPress(m) } : {};
 
   if (m.msgType === 'system') {
     return <Text style={[styles.system, { color: theme.mute }]}>{m.message}</Text>;
