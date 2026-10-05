@@ -22,8 +22,11 @@ function isDuplicate(prev: ChatMessage[], m: ChatMessage): boolean {
   return false;
 }
 
+/** Socket state, or 'unavailable' when the channel has no chat room to connect to. */
+export type SessionConnState = ConnState | 'unavailable';
+
 export interface ChatSession {
-  connState: ConnState;
+  connState: SessionConnState;
   liveStatus: 'OPEN' | 'CLOSE' | null;
   chatChannelId: string | null;
   messages: ChatMessage[];
@@ -41,7 +44,7 @@ export function useChatSession(
   channelId: string,
   auth: { cookie?: string; uid?: string } = {},
 ): ChatSession {
-  const [connState, setConnState] = useState<ConnState>('idle');
+  const [connState, setConnState] = useState<SessionConnState>('idle');
   const [liveStatus, setLiveStatus] = useState<'OPEN' | 'CLOSE' | null>(null);
   const [chatChannelId, setChatChannelId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -102,12 +105,17 @@ export function useChatSession(
         const status = await getLiveStatus(channelId);
         if (cancelled) return;
         setLiveStatus(status.status);
-        setChatChannelId(status.chatChannelId);
+        const cid = status.chatChannelId;
+        setChatChannelId(cid);
+        if (!cid) {
+          setConnState('unavailable');
+          return;
+        }
 
         socket = new ChatSocket({
-          chatChannelId: status.chatChannelId,
+          chatChannelId: cid,
           streamingChannelId: channelId,
-          getAccessToken: () => getAccessToken(status.chatChannelId, auth.cookie),
+          getAccessToken: () => getAccessToken(cid, auth.cookie),
           uid: auth.uid,
           onMessage: (m) => {
             if (typeof m.extras.streamingChannelId === 'string') {
@@ -122,7 +130,7 @@ export function useChatSession(
               // this session; add a retry with backoff if transient failures show up as missing avatars.
               requested.add(m.userIdHash);
               profileQueue.push(m.userIdHash);
-              pumpProfiles(status.chatChannelId);
+              pumpProfiles(cid);
             }
             enqueueLog(channelId, m);
             pending.push(m);

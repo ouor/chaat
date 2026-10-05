@@ -26,6 +26,7 @@ const CONN_META: Record<string, { label: string; color: 'primarySoft' | 'mute' |
   connected: { label: '연결됨', color: 'mute' },
   reconnecting: { label: '다시 연결 중…', color: 'mute' },
   offline: { label: '연결 끊김', color: 'danger' },
+  unavailable: { label: '채팅 없음', color: 'mute' },
 };
 
 function chatKey(m: ChatMessage): string {
@@ -321,7 +322,17 @@ export default function ChatScreen() {
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              {connState === 'connected' ? (
+              {connState === 'unavailable' ? (
+                <>
+                  <View style={[styles.emptyIcon, { backgroundColor: theme.canvasSoft }]}>
+                    <Icon name="chat" color={theme.mute} size={24} />
+                  </View>
+                  <Text style={[Type.bodyStrong, { color: theme.ink }]}>이 채널은 채팅을 볼 수 없어요</Text>
+                  <Text style={[Type.label, styles.emptyHint, { color: theme.mute }]}>
+                    아직 방송한 적이 없거나 채팅이 막혀 있는 채널이에요.
+                  </Text>
+                </>
+              ) : connState === 'connected' ? (
                 <>
                   <View style={[styles.emptyIcon, { backgroundColor: theme.canvasSoft }]}>
                     <Icon name="chat" color={theme.mute} size={24} />

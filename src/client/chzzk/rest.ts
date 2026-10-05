@@ -87,11 +87,11 @@ export function searchChannels(
 }
 
 export function getLiveStatus(channelId: string): Promise<LiveStatus> {
-  return get<LiveStatus>(
-    SERVICE_BASE,
-    `/polling/v2/channels/${channelId}/live-status`,
-    {},
-  );
+  return get<LiveStatus>(SERVICE_BASE, `/polling/v2/channels/${channelId}/live-status`, {}).then((c) => ({
+    ...c,
+    // Validated here so nothing downstream opens a socket for a null/empty chat room id.
+    chatChannelId: typeof c.chatChannelId === 'string' && c.chatChannelId.length > 0 ? c.chatChannelId : null,
+  }));
 }
 
 export function getChannel(channelId: string): Promise<ChannelDetail> {

@@ -17,7 +17,8 @@ export interface LiveStatus {
   channelId: string;
   status: LiveStatusValue;
   concurrentUserCount: number;
-  chatChannelId: string;
+  /** null for channels without a chat room (never streamed, age-restricted, ...). */
+  chatChannelId: string | null;
 }
 
 export interface AccessToken {

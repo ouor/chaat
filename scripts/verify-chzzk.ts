@@ -18,7 +18,12 @@ async function main() {
   const status = await getLiveStatus(channelId);
   console.log(`live-status: status=${status.status} chatChannelId=${status.chatChannelId}`);
 
-  const token = await getAccessToken(status.chatChannelId);
+  const chatChannelId = status.chatChannelId;
+  if (!chatChannelId) {
+    console.log('no chat room for this channel');
+    return;
+  }
+  const token = await getAccessToken(chatChannelId);
   console.log(`access-token: realNameAuth=${token.realNameAuth ?? 'n/a'}`);
 
   let connected = false;
@@ -28,7 +33,7 @@ async function main() {
     if (count <= 5) console.log(`msg[${m.msgType}] ${m.nickname}: ${m.message}`);
   };
   const sock = new ChatSocket({
-    chatChannelId: status.chatChannelId,
+    chatChannelId,
     streamingChannelId: channelId,
     getAccessToken: async () => token,
     onMessage,
