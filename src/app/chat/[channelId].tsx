@@ -214,7 +214,7 @@ export default function ChatScreen() {
           </View>
         </View>
         <Pressable style={styles.headerButton} hitSlop={8} onPress={() => router.push(`/logs/${channelId}`)}>
-          <Icon name="more" color={theme.body} />
+          <Icon name="history" color={theme.body} />
         </Pressable>
         {canModerate && loggedIn ? (
           <Pressable

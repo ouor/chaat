@@ -1,6 +1,7 @@
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Spacing } from '@/constants/tokens';
+import { Radius, Spacing } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
 export function BottomSheet({
@@ -13,11 +14,17 @@ export function BottomSheet({
   children: React.ReactNode;
 }) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={[styles.sheet, { backgroundColor: theme.canvas, borderTopColor: theme.hairline }]}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={[styles.overlay, { backgroundColor: theme.scrim }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="닫기" />
+        <View
+          style={[
+            styles.sheet,
+            { backgroundColor: theme.canvasSoft, paddingBottom: Math.max(insets.bottom, Spacing.lg) + Spacing.sm },
+          ]}>
+          <View style={[styles.handle, { backgroundColor: theme.canvasSoft2 }]} />
           {children}
         </View>
       </View>
@@ -31,11 +38,16 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    borderTopWidth: 1,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.xxxl,
+    borderTopLeftRadius: Radius.xl + 8,
+    borderTopRightRadius: Radius.xl + 8,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.sm,
+  },
+  handle: {
+    alignSelf: 'center',
+    width: 36,
+    height: 4,
+    borderRadius: Radius.pill,
+    marginBottom: Spacing.lg,
   },
 });
