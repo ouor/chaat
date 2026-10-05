@@ -10,8 +10,7 @@ import { ScreenHeader } from '@/components/ui/screen-header';
 import { Radius, Spacing, Type } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
-import { readNaverCookiesFromWebView } from '@/storage/cookie-reader';
-import type { NaverCookies } from '@/storage/keychain';
+import type { NaverCookies } from '@/store/auth-context';
 
 // Reassurance for people wary of signing in through an app they don't know yet.
 const POINTS: { icon: IconName; title: string; body: string }[] = [
@@ -33,7 +32,7 @@ export default function LoginScreen() {
   const router = useRouter();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { login } = useAuth();
+  const { login, readWebViewSession } = useAuth();
 
   const [phase, setPhase] = useState<'idle' | 'webview' | 'fail'>('idle');
   const [loading, setLoading] = useState(true);
@@ -74,7 +73,7 @@ export default function LoginScreen() {
     if (phase !== 'webview') return;
     const t = setInterval(() => {
       if (doneRef.current) return;
-      void readNaverCookiesFromWebView().then((c) => {
+      void readWebViewSession().then((c) => {
         if (c && !doneRef.current) void tryLogin(c);
       });
     }, 2000);

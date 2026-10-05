@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type PropsWithChildren } from 'react';
 
 import { getUserStatus } from '@/client/chzzk/rest';
-import { clearWebViewCookies } from '@/storage/cookie-reader';
+import { clearWebViewCookies, readNaverCookiesFromWebView } from '@/storage/cookie-reader';
 import { clearNaverCookies, loadNaverCookies, saveNaverCookies, type NaverCookies } from '@/storage/keychain';
 
 interface AuthState {
@@ -10,12 +10,17 @@ interface AuthState {
   uid?: string;
   login: (cookies: NaverCookies) => Promise<boolean>;
   logout: () => Promise<void>;
+  /** Naver session cookies the login WebView has received so far (null until signed in there). */
+  readWebViewSession: () => Promise<NaverCookies | null>;
 }
+
+export type { NaverCookies };
 
 const AuthContext = createContext<AuthState>({
   loggedIn: false,
   login: async () => false,
   logout: async () => undefined,
+  readWebViewSession: async () => null,
 });
 
 export function AuthProvider({ children }: PropsWithChildren) {
@@ -64,7 +69,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setState({ loggedIn: false });
   }, []);
 
-  return <AuthContext.Provider value={{ ...state, login, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ ...state, login, logout, readWebViewSession: readNaverCookiesFromWebView }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthState {
