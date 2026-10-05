@@ -12,10 +12,17 @@ import type { ChatMessage } from './types';
 
 export type ConnState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'offline';
 
+export interface ChatTokens {
+  accessToken: string;
+  extraToken: string;
+}
+
 export interface ChatSocketOptions {
   chatChannelId: string;
+  /** The streamer's channel id; outgoing chats must name it (not the chat room id). */
+  streamingChannelId: string;
   /** Called on every (re)connect so a reconnect never reuses an expired token. */
-  getAccessToken: () => Promise<string>;
+  getAccessToken: () => Promise<ChatTokens>;
   uid?: string;
   onMessage: (m: ChatMessage) => void;
   onNotice?: (text: string) => void;
@@ -33,6 +40,7 @@ export class ChatSocket {
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private sid: string | undefined;
+  private extraToken = '';
   private state: ConnState = 'idle';
   private retries = 0;
   private closed = false;
@@ -46,14 +54,14 @@ export class ChatSocket {
 
   sendChat(text: string): void {
     if (this.state !== 'connected') return;
-    const now = Date.now();
-    const extras = JSON.stringify({
+    const extras = {
       chatType: 'STREAMING',
       emojis: {},
       osType: 'PC',
-      streamingChannelId: this.opts.chatChannelId,
-    });
-    this.send(JSON.stringify(sendChatMessage(this.opts.chatChannelId, text, now, extras, this.sid)));
+      extraToken: this.extraToken,
+      streamingChannelId: this.opts.streamingChannelId,
+    } as const;
+    this.send(JSON.stringify(sendChatMessage(this.opts.chatChannelId, text, Date.now(), extras, this.sid)));
   }
 
   requestRecent(count = 50): void {
@@ -85,7 +93,9 @@ export class ChatSocket {
     this.setState(this.retries > 0 ? 'reconnecting' : 'connecting');
     let accTkn: string;
     try {
-      accTkn = await this.opts.getAccessToken();
+      const tokens = await this.opts.getAccessToken();
+      accTkn = tokens.accessToken;
+      this.extraToken = tokens.extraToken;
     } catch {
       if (!this.closed) this.scheduleReconnect();
       return;

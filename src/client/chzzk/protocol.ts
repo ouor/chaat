@@ -61,11 +61,26 @@ export function connectMessage(
   };
 }
 
+/**
+ * Extras every outgoing chat must carry. Verified against live frames sent by the official PC/AOS
+ * clients: without extraToken, or with the chat room id as streamingChannelId, the server acks the
+ * send (13101 SUCCESS) and then immediately blinds it (94008).
+ */
+export interface SendChatExtras {
+  chatType: 'STREAMING';
+  emojis: Record<string, string>;
+  osType: 'PC';
+  /** From the access-token response, alongside accessToken. */
+  extraToken: string;
+  /** The streamer's channel id (not the chat room id). */
+  streamingChannelId: string;
+}
+
 export function sendChatMessage(
   cid: string,
   msg: string,
   msgTime: number,
-  extras: string,
+  extras: SendChatExtras,
   sid?: string,
 ): WsMessage {
   return {
@@ -73,7 +88,7 @@ export function sendChatMessage(
     retry: false,
     sid,
     tid: 3,
-    bdy: { extras, msg, msgTime, msgTypeCode: 1 },
+    bdy: { extras: JSON.stringify(extras), msg, msgTime, msgTypeCode: 1 },
   };
 }
 
@@ -359,8 +374,16 @@ export function selfCheck(): void {
   assert(recent.length === 2 && recent[1].message === 'two', 'recent parse');
   assert(recent[0].msgTime === 1700000001000 && recent[1].userIdHash === 'b', 'recent field names');
 
-  const send = sendChatMessage('abc', 'hi', 123, '{}', 'sid1');
+  const send = sendChatMessage(
+    'abc',
+    'hi',
+    123,
+    { chatType: 'STREAMING', emojis: {}, osType: 'PC', extraToken: 'xt', streamingChannelId: 'ch1' },
+    'sid1',
+  );
   assert(send.cmd === Cmd.SEND_CHAT && send.bdy.msg === 'hi' && send.sid === 'sid1', 'send encode');
+  const sentExtras = JSON.parse(String(send.bdy.extras)) as Record<string, unknown>;
+  assert(sentExtras.extraToken === 'xt' && sentExtras.streamingChannelId === 'ch1', 'send extras');
   assert(pingMessage('abc').cmd === Cmd.PING, 'ping encode');
   assert(pongMessage().cmd === Cmd.PONG, 'pong encode');
   const rec = recentChatMessage('abc', 'sid1');

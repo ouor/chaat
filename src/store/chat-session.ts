@@ -104,7 +104,8 @@ export function useChatSession(
 
         socket = new ChatSocket({
           chatChannelId: status.chatChannelId,
-          getAccessToken: () => getAccessToken(status.chatChannelId, auth.cookie).then((t) => t.accessToken),
+          streamingChannelId: channelId,
+          getAccessToken: () => getAccessToken(status.chatChannelId, auth.cookie),
           uid: auth.uid,
           onMessage: (m) => {
             if (typeof m.extras.streamingChannelId === 'string') {

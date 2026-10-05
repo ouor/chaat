@@ -29,7 +29,8 @@ async function main() {
   };
   const sock = new ChatSocket({
     chatChannelId: status.chatChannelId,
-    getAccessToken: async () => token.accessToken,
+    streamingChannelId: channelId,
+    getAccessToken: async () => token,
     onMessage,
     onConnected: () => {
       connected = true;

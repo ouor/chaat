@@ -38,7 +38,8 @@ async function main() {
   let tokens = 0;
   const sock = new ChatSocket({
     chatChannelId: 'abc',
-    getAccessToken: async () => `t${++tokens}`,
+    streamingChannelId: 'ch1',
+    getAccessToken: async () => ({ accessToken: `t${++tokens}`, extraToken: `x${tokens}` }),
     onMessage: () => undefined,
   });
 
@@ -57,6 +58,12 @@ async function main() {
 
   // CONNECTED resets backoff, so the next drop retries after 1s again (not 2s).
   FakeWs.all[1].receive({ cmd: Cmd.CONNECTED, bdy: { sid: 's' } });
+
+  // Outgoing chat carries the extraToken from the current connect and the streamer channel id.
+  sock.sendChat('hi');
+  const sent = JSON.parse(FakeWs.all[1].sent.at(-1) as string) as { bdy: { extras: string } };
+  const extras = JSON.parse(sent.bdy.extras) as Record<string, unknown>;
+  assert(extras.extraToken === 'x2' && extras.streamingChannelId === 'ch1', 'send carries extraToken + channel id');
   FakeWs.all[1].drop();
   await sleep(1100);
   assert(FakeWs.all.length === 3, 'backoff resets after CONNECTED');
