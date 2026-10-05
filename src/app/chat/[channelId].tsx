@@ -235,7 +235,7 @@ export default function ChatScreen() {
             <IconButton
               name={fav ? 'starFilled' : 'star'}
               label={fav ? '즐겨찾기에서 빼기' : '즐겨찾기에 추가'}
-              color={fav ? 'favorite' : 'body'}
+              color={fav ? 'ink' : 'body'}
               onPress={() =>
                 toggleFavorite({ channelId, channelName: name || channelId, channelImageUrl: image ?? '' })
               }

@@ -185,7 +185,7 @@ export default function SearchScreen() {
                 <IconButton
                   name={fav ? 'starFilled' : 'star'}
                   label={fav ? '즐겨찾기에서 빼기' : '즐겨찾기에 추가'}
-                  color={fav ? 'favorite' : 'mute'}
+                  color={fav ? 'ink' : 'mute'}
                   onPress={() =>
                     toggleFavorite({ channelId: ch.channelId, channelName: ch.channelName, channelImageUrl: ch.channelImageUrl })
                   }
