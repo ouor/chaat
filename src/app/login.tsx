@@ -38,6 +38,8 @@ export default function LoginScreen() {
   const [busy, setBusy] = useState(false);
   const webviewRef = useRef<WebView>(null);
   const doneRef = useRef(false);
+  // A ref, not the `busy` state: the 2s poll closure is created once and would only ever see busy=false.
+  const busyRef = useRef(false);
 
   useEffect(() => {
     if (phase !== 'webview') return;
@@ -53,9 +55,11 @@ export default function LoginScreen() {
   }, [phase]);
 
   async function tryLogin(cookies: NaverCookies): Promise<void> {
-    if (busy || doneRef.current) return;
+    if (busyRef.current || doneRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     const ok = await login(cookies);
+    busyRef.current = false;
     if (ok) {
       doneRef.current = true;
       router.back();
