@@ -19,14 +19,29 @@ type Entry =
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
+function shortDate(ms: number, now = new Date()): string {
+  const d = new Date(ms);
+  const year = d.getFullYear() === now.getFullYear() ? '' : `${d.getFullYear()}년 `;
+  return `${year}${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
+
+/** Always the real date; 오늘/어제 is added, never a replacement for it. */
 function dayLabel(ms: number, now = new Date()): string {
   const d = new Date(ms);
   const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const diff = Math.round((startOf(now) - startOf(d)) / 86_400_000);
-  if (diff === 0) return '오늘';
-  if (diff === 1) return '어제';
-  const year = d.getFullYear() === now.getFullYear() ? '' : `${d.getFullYear()}년 `;
-  return `${year}${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAYS[d.getDay()]})`;
+  const date = `${shortDate(ms, now)} (${WEEKDAYS[d.getDay()]})`;
+  if (diff === 0) return `오늘 · ${date}`;
+  if (diff === 1) return `어제 · ${date}`;
+  return date;
+}
+
+/** Header subtitle: the loaded date range, so the date is visible without scrolling to the top. */
+function rangeLabel(rowsOldestFirst: LogRow[]): string {
+  if (rowsOldestFirst.length === 0) return '이 폰에 저장된 지난 채팅';
+  const first = shortDate(rowsOldestFirst[0].msg_time);
+  const last = shortDate(rowsOldestFirst[rowsOldestFirst.length - 1].msg_time);
+  return `저장된 채팅 · ${first === last ? first : `${first} ~ ${last}`}`;
 }
 
 function fmtTime(ms: number): string {
@@ -91,7 +106,7 @@ export default function LogsScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.canvas }]}>
-      <ScreenHeader title={title} subtitle="이 폰에 저장된 지난 채팅" />
+      <ScreenHeader title={title} subtitle={rangeLabel(rows)} />
 
       {hasAny ? (
         <View style={[styles.searchWrap, { backgroundColor: theme.canvasSoft }]}>
