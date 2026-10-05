@@ -11,7 +11,6 @@ export interface Settings {
   theme: ThemeMode;
   fontScale: FontScale;
   retentionDays: RetentionDays;
-  autoscroll: boolean;
   chatVariant: ChatVariant;
 }
 
@@ -19,7 +18,6 @@ const DEFAULTS: Settings = {
   theme: 'dark',
   fontScale: 'md',
   retentionDays: 30,
-  autoscroll: true,
   chatVariant: 'compact',
 };
 const KEY = 'settings';

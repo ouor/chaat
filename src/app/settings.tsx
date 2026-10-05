@@ -1,53 +1,55 @@
-import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import type { ChatMessage } from '@/client/chzzk/types';
+import { ChatRow } from '@/components/chat/chat-row';
+import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
-import { Radius, Spacing } from '@/constants/tokens';
+import { ScreenHeader } from '@/components/ui/screen-header';
+import { Segmented } from '@/components/ui/segmented';
+import { Radius, Spacing, TOUCH, Type } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
 import { updateSettings, useSettings, type ChatVariant, type FontScale, type RetentionDays, type ThemeMode } from '@/store/settings';
 import { clearLogs, countLogs, pruneLogs } from '@/storage/log-repo';
-import { useCallback, useState } from 'react';
 
-const FONT_PREVIEW: Record<FontScale, number> = { sm: 13, md: 14, lg: 16, xl: 18 };
+const sample = (p: Partial<ChatMessage> & Pick<ChatMessage, 'nickname' | 'message'>): ChatMessage => ({
+  chatChannelId: 'preview',
+  userIdHash: p.nickname,
+  msgType: 'text',
+  role: 'member',
+  msgTime: 0,
+  extras: {},
+  ...p,
+});
 
-function Segment<T extends string | number>({
-  options,
-  value,
-  onSelect,
-}: {
-  options: { label: string; value: T }[];
-  value: T;
-  onSelect: (v: T) => void;
-}) {
+const PREVIEW: ChatMessage[] = [
+  sample({ nickname: '하늘', message: '오늘 방송도 재밌었어요!' }),
+  sample({ nickname: '보라', message: '다음 방송은 언제 하나요?', role: 'manager' }),
+  sample({ nickname: '민재', message: '수고하셨습니다', msgType: 'donation', donationAmount: 1000 }),
+];
+
+function Card({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   const theme = useTheme();
   return (
-    <View style={[styles.segment, { borderColor: theme.hairline }]}>
-      {options.map((opt, i) => {
-        const active = opt.value === value;
-        return (
-          <Pressable
-            key={String(opt.value)}
-            onPress={() => onSelect(opt.value)}
-            style={[
-              styles.segmentItem,
-              i > 0 && { borderLeftWidth: 1, borderLeftColor: theme.hairline },
-              active && { backgroundColor: theme.primary },
-            ]}>
-            <Text style={[styles.segmentText, { color: active ? theme.onPrimary : theme.body }]}>{opt.label}</Text>
-          </Pressable>
-        );
-      })}
+    <View style={styles.section}>
+      <Text style={[Type.heading, styles.sectionTitle, { color: theme.ink }]}>{title}</Text>
+      {description ? (
+        <Text style={[Type.label, styles.sectionDesc, { color: theme.mute }]}>{description}</Text>
+      ) : null}
+      <View style={[styles.card, { backgroundColor: theme.canvasSoft }]}>{children}</View>
     </View>
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   const theme = useTheme();
   return (
-    <View style={styles.row}>
-      <Text style={[styles.rowLabel, { color: theme.ink }]}>{label}</Text>
+    <View style={styles.field}>
+      <Text style={[Type.label, { color: theme.body, fontWeight: 600 }]}>{label}</Text>
       {children}
     </View>
   );
@@ -56,208 +58,182 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export default function SettingsScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const { loggedIn, uid, logout } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { loggedIn, logout } = useAuth();
   const settings = useSettings();
   const [logCount, setLogCount] = useState<number | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const refreshCount = useCallback(() => {
     void countLogs().then(setLogCount);
   }, []);
 
+  useFocusEffect(refreshCount);
+
   return (
     <View style={[styles.root, { backgroundColor: theme.canvas }]}>
-      <SafeAreaView edges={['top']} style={[styles.header, { borderBottomColor: theme.hairline }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={8}>
-          <Icon name="back" color={theme.body} />
-        </Pressable>
-        <Text style={[styles.title, { color: theme.ink }]}>Settings</Text>
-      </SafeAreaView>
+      <ScreenHeader title="설정" />
 
-      <View style={styles.body}>
-        <View style={[styles.accountCard, { borderColor: theme.hairline }]}>
-          <View style={[styles.avatar, { borderColor: theme.hairline, backgroundColor: theme.canvasSoft }]}>
-            <Text style={[styles.avatarText, { color: theme.mute }]}>{loggedIn ? '·' : '?'}</Text>
+      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + Spacing.xxxl }]}>
+        <View style={[styles.account, { backgroundColor: theme.canvasSoft }]}>
+          <View style={[styles.accountIcon, { backgroundColor: theme.canvasSoft2 }]}>
+            <Icon name="lock" color={theme.body} size={20} />
           </View>
           <View style={styles.accountInfo}>
-            <Text style={[styles.accountName, { color: theme.ink }]}>
-              {loggedIn ? (uid ? `#${uid.slice(0, 8)}…` : 'Signed in') : 'Not signed in'}
+            <Text style={[Type.bodyStrong, { color: theme.ink }]}>
+              {loggedIn ? '네이버로 로그인했어요' : '로그인하지 않았어요'}
             </Text>
-            <Text style={[styles.accountSub, { color: theme.mute }]}>
-              {loggedIn ? 'naver · session saved in keychain' : 'read-only mode'}
+            <Text style={[Type.caption, { color: theme.mute }]}>
+              {loggedIn ? '로그인 정보는 이 폰의 보안 저장소에만 있어요' : '채팅 보기는 로그인 없이도 돼요'}
             </Text>
           </View>
-          <Pressable
-            onPress={() => (loggedIn ? logout() : router.push('/login'))}
-            style={[
-              styles.authButton,
-              { borderColor: theme.hairline, backgroundColor: loggedIn ? 'transparent' : theme.primary },
-            ]}>
-            <Text style={{ color: loggedIn ? theme.body : theme.onPrimary, fontSize: 12.5, fontWeight: 600 }}>
-              {loggedIn ? 'Sign out' : 'Sign in'}
-            </Text>
-          </Pressable>
+          {loggedIn ? (
+            <Button label="로그아웃" size="sm" variant="secondary" onPress={logout} />
+          ) : (
+            <Button label="로그인" size="sm" onPress={() => router.push('/login')} />
+          )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: theme.mute }]}>APPEARANCE</Text>
-          <Row label="Theme">
-            <Segment<ThemeMode>
+        <Card title="화면">
+          <Field label="테마">
+            <Segmented<ThemeMode>
               options={[
-                { label: 'Dark', value: 'dark' },
-                { label: 'Light', value: 'light' },
+                { label: '어둡게', value: 'dark' },
+                { label: '밝게', value: 'light' },
               ]}
               value={settings.theme}
               onSelect={(v) => updateSettings({ theme: v })}
             />
-          </Row>
-          <Row label="Chat font size">
-            <Segment<FontScale>
-              options={['sm', 'md', 'lg', 'xl'].map((k) => ({ label: k.toUpperCase(), value: k as FontScale }))}
+          </Field>
+          <Field label="채팅 글자 크기">
+            <Segmented<FontScale>
+              options={[
+                { label: '작게', value: 'sm', fontSize: 13 },
+                { label: '보통', value: 'md', fontSize: 15 },
+                { label: '크게', value: 'lg', fontSize: 17 },
+                { label: '최대', value: 'xl', fontSize: 19 },
+              ]}
               value={settings.fontScale}
               onSelect={(v) => updateSettings({ fontScale: v })}
             />
-          </Row>
-          <Row label="Chat layout">
-            <Segment<ChatVariant>
+          </Field>
+          <Field label="채팅 모양">
+            <Segmented<ChatVariant>
               options={[
-                { label: 'Compact', value: 'compact' },
-                { label: 'Card', value: 'card' },
+                { label: '한 줄로 촘촘하게', value: 'compact' },
+                { label: '두 줄로 넉넉하게', value: 'card' },
               ]}
               value={settings.chatVariant}
               onSelect={(v) => updateSettings({ chatVariant: v })}
             />
-          </Row>
-          <View style={[styles.preview, { borderColor: theme.hairline, backgroundColor: theme.canvasSoft }]}>
-            <Text style={{ color: theme.primarySoft, fontSize: 12.5, fontWeight: 600 }}>preview</Text>
-            <Text style={{ color: theme.ink, fontSize: FONT_PREVIEW[settings.fontScale], lineHeight: 22 }}>
-              this is how chat will read at a glance
-            </Text>
+          </Field>
+          <View style={[styles.preview, { backgroundColor: theme.canvas }]}>
+            <Text style={[Type.micro, styles.previewLabel, { color: theme.mute }]}>미리보기</Text>
+            {PREVIEW.map((m) => (
+              <ChatRow key={m.nickname} m={m} showTime={false} />
+            ))}
           </View>
-          <Row label="Auto-scroll to newest">
-            <Pressable onPress={() => updateSettings({ autoscroll: !settings.autoscroll })}>
-              <View
-                style={[
-                  styles.switch,
-                  { backgroundColor: settings.autoscroll ? theme.primary : theme.canvasSoft, borderColor: theme.hairline },
-                ]}>
-                <View
-                  style={[
-                    styles.switchKnob,
-                    { backgroundColor: settings.autoscroll ? theme.onPrimary : theme.mute },
-                    { alignSelf: settings.autoscroll ? 'flex-end' : 'flex-start' },
-                  ]}
-                />
-              </View>
-            </Pressable>
-          </Row>
-        </View>
+        </Card>
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: theme.mute }]}>CHAT LOGS</Text>
-          <Row label="Keep for">
-            <Segment<RetentionDays>
+        <Card
+          title="채팅 기록"
+          description="본 채팅은 이 폰에 자동으로 저장돼요. 채팅방 오른쪽 위 시계 버튼을 누르면 다시 볼 수 있어요.">
+          <Field label="보관 기간">
+            <Segmented<RetentionDays>
               options={[
-                { label: '7d', value: 7 },
-                { label: '30d', value: 30 },
-                { label: '90d', value: 90 },
-                { label: '∞', value: 0 },
+                { label: '7일', value: 7 },
+                { label: '30일', value: 30 },
+                { label: '90일', value: 90 },
+                { label: '계속', value: 0 },
               ]}
               value={settings.retentionDays}
               onSelect={(v) => {
                 updateSettings({ retentionDays: v });
-                void pruneLogs(v);
-                refreshCount();
+                void pruneLogs(v).then(refreshCount);
               }}
             />
-          </Row>
-          <Pressable
-            onPress={() => {
-              void clearLogs().then(refreshCount);
-            }}
-            style={[styles.linkRow, { borderTopColor: theme.hairline }]}>
-            <Text style={{ color: theme.danger, fontSize: 14 }}>Delete all logs</Text>
-            <Text style={{ color: theme.mute, fontSize: 12, fontFamily: 'monospace' }}>
-              {logCount === null ? '' : `${logCount} rows`}
+          </Field>
+          <View style={[styles.divider, { backgroundColor: theme.hairline }]} />
+          <View style={styles.statRow}>
+            <Text style={[Type.label, { color: theme.body }]}>저장된 채팅</Text>
+            <Text style={[Type.label, { color: theme.ink, fontWeight: 700 }]}>
+              {logCount === null ? '…' : `${logCount.toLocaleString()}개`}
             </Text>
+          </View>
+          <Pressable
+            onPress={() => setConfirmClear(true)}
+            disabled={!logCount}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.linkRow, { opacity: !logCount ? 0.4 : pressed ? 0.6 : 1 }]}>
+            <Text style={[Type.label, { color: theme.danger }]}>저장된 채팅 모두 지우기</Text>
+            <Icon name="chevron" color={theme.mute} size={16} />
           </Pressable>
+        </Card>
+
+        <Text style={[Type.micro, styles.footer, { color: theme.mute }]}>
+          chaat은 치지직 공식 앱이 아니에요.{'\n'}채팅 기록은 이 폰에만 저장되고 어디에도 보내지 않아요.
+        </Text>
+      </ScrollView>
+
+      <BottomSheet visible={confirmClear} onClose={() => setConfirmClear(false)}>
+        <View style={styles.sheet}>
+          <Text style={[Type.title, { color: theme.ink }]}>저장된 채팅을 모두 지울까요?</Text>
+          <Text style={[Type.body, { color: theme.mute }]}>
+            {logCount ? `${logCount.toLocaleString()}개의 채팅이 지워져요. ` : ''}지운 채팅은 되돌릴 수 없어요.
+          </Text>
+          <View style={styles.sheetActions}>
+            <Button label="취소" variant="secondary" stretch onPress={() => setConfirmClear(false)} />
+            <Button
+              label="모두 지우기"
+              variant="danger"
+              stretch
+              onPress={() => {
+                setConfirmClear(false);
+                void clearLogs().then(refreshCount);
+              }}
+            />
+          </View>
         </View>
-      </View>
+      </BottomSheet>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: 1,
-  },
-  backButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 17, fontWeight: 600, letterSpacing: -0.3 },
-  body: { padding: Spacing.lg, gap: Spacing.xxxl },
-  accountCard: {
+  body: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm, gap: Spacing.xxxl },
+  account: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
     padding: Spacing.lg,
-    borderRadius: Radius.md,
-    borderWidth: 1,
+    borderRadius: Radius.xl,
   },
-  avatar: {
+  accountIcon: {
     width: 40,
     height: 40,
     borderRadius: Radius.pill,
-    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { fontSize: 14, fontWeight: 600 },
-  accountInfo: { flex: 1, gap: 3 },
-  accountName: { fontSize: 14.5, fontWeight: 600 },
-  accountSub: { fontSize: 10.5, fontFamily: 'monospace' },
-  authButton: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: 8,
-    borderRadius: Radius.sm,
-    borderWidth: 1,
-  },
-  section: { gap: Spacing.lg },
-  sectionLabel: { fontSize: 11, fontWeight: 600, letterSpacing: 2.5 },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm },
-  rowLabel: { fontSize: 14 },
-  segment: { flexDirection: 'row', borderRadius: Radius.sm, borderWidth: 1, overflow: 'hidden' },
-  segmentItem: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  segmentText: { fontSize: 12.5, fontWeight: 600, fontFamily: 'monospace' },
-  preview: {
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    gap: Spacing.xs,
-  },
-  switch: {
-    width: 44,
-    height: 26,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
-    padding: 2,
-    justifyContent: 'center',
-  },
-  switchKnob: { width: 20, height: 20, borderRadius: Radius.pill },
+  accountInfo: { flex: 1, gap: 2 },
+  section: { gap: Spacing.sm },
+  sectionTitle: { paddingHorizontal: Spacing.xs },
+  sectionDesc: { paddingHorizontal: Spacing.xs, fontWeight: 400 },
+  card: { borderRadius: Radius.xl, padding: Spacing.lg, gap: Spacing.xl },
+  field: { gap: Spacing.sm },
+  preview: { borderRadius: Radius.lg, paddingVertical: Spacing.sm },
+  previewLabel: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xs },
+  divider: { height: StyleSheet.hairlineWidth, marginVertical: -Spacing.sm },
+  statRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   linkRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 11,
-    borderTopWidth: 1,
+    minHeight: TOUCH,
+    marginVertical: -Spacing.md,
   },
+  footer: { textAlign: 'center', lineHeight: 18 },
+  sheet: { gap: Spacing.md },
+  sheetActions: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm },
 });
