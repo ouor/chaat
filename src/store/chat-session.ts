@@ -6,6 +6,16 @@ import type { ChatMessage } from '@/client/chzzk/types';
 import { enqueueLog } from '@/storage/log-repo';
 
 const MAX_MESSAGES = 500;
+// Reconnect re-requests the last 50 recent chats; they can only overlap the tail of the list.
+const DEDUP_WINDOW = 100;
+
+function isDuplicate(prev: ChatMessage[], m: ChatMessage): boolean {
+  for (let i = prev.length - 1; i >= Math.max(0, prev.length - DEDUP_WINDOW); i--) {
+    const p = prev[i];
+    if (p.msgTime === m.msgTime && p.userIdHash === m.userIdHash && p.message === m.message) return true;
+  }
+  return false;
+}
 
 export interface ChatSession {
   connState: ConnState;
@@ -95,9 +105,10 @@ export function useChatSession(
                 .finally(() => pendingProfiles.current.delete(m.userIdHash));
             }
             enqueueLog(channelId, m);
-            setMessages((prev) =>
-              prev.length >= MAX_MESSAGES ? [...prev.slice(-(MAX_MESSAGES - 1)), m] : [...prev, m],
-            );
+            setMessages((prev) => {
+              if (isDuplicate(prev, m)) return prev;
+              return prev.length >= MAX_MESSAGES ? [...prev.slice(-(MAX_MESSAGES - 1)), m] : [...prev, m];
+            });
           },
           onNotice: (text) => setNotice(text),
           onStateChange: setConnState,
