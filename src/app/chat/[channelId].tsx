@@ -82,6 +82,8 @@ export default function ChatScreen() {
     if (ids.length > 0) requestProfileImages(cid, ids);
   });
   const [confirmBlind, setConfirmBlind] = useState(false);
+  // Moderation calls can fail (expired session, permission); say so instead of a dead button.
+  const [actionError, setActionError] = useState<string | null>(null);
   const [unread, setUnread] = useState(0);
   const [composerOpen, setComposerOpen] = useState(false);
   const [noticeDraft, setNoticeDraft] = useState('');
@@ -185,6 +187,7 @@ export default function ChatScreen() {
   );
 
   function closeProfile() {
+    setActionError(null);
     setSelected(null);
     setProfileCard(null);
     setConfirmBlind(false);
@@ -214,7 +217,9 @@ export default function ChatScreen() {
       messageTime: selected.msgTime,
       messageUserIdHash: selected.userIdHash,
       streamingChannelId,
-    }).then(closeProfile);
+    })
+      .then(closeProfile)
+      .catch(() => setActionError('메시지를 가리지 못했어요. 잠시 후 다시 시도해 주세요.'));
   }
 
   function handlePostNotice() {
@@ -226,10 +231,13 @@ export default function ChatScreen() {
       messageTime: Date.now(),
       messageUserIdHash: uid,
       streamingChannelId,
-    }).then(() => {
-      setComposerOpen(false);
-      setNoticeDraft('');
-    });
+    })
+      .then(() => {
+        setActionError(null);
+        setComposerOpen(false);
+        setNoticeDraft('');
+      })
+      .catch(() => setActionError('공지를 올리지 못했어요. 잠시 후 다시 시도해 주세요.'));
   }
 
   function handleClearNotice() {
@@ -239,7 +247,12 @@ export default function ChatScreen() {
       messageTime: Date.now(),
       messageUserIdHash: uid,
       streamingChannelId,
-    }).then(() => setComposerOpen(false));
+    })
+      .then(() => {
+        setActionError(null);
+        setComposerOpen(false);
+      })
+      .catch(() => setActionError('공지를 내리지 못했어요. 잠시 후 다시 시도해 주세요.'));
   }
 
   const bottomPad = Math.max(insets.bottom, Spacing.md);
@@ -427,7 +440,12 @@ export default function ChatScreen() {
         <View style={{ height: insets.bottom }} />
       )}
 
-      <BottomSheet visible={composerOpen} onClose={() => setComposerOpen(false)}>
+      <BottomSheet
+        visible={composerOpen}
+        onClose={() => {
+          setActionError(null);
+          setComposerOpen(false);
+        }}>
         <View style={styles.sheetBody}>
           <View style={styles.sheetIntro}>
             <Text style={[Type.title, { color: theme.ink }]}>공지 올리기</Text>
@@ -443,6 +461,7 @@ export default function ChatScreen() {
             multiline
             style={[Type.body, styles.composerInput, { backgroundColor: theme.canvas, color: theme.ink }]}
           />
+          {actionError ? <Text style={[Type.label, { color: theme.danger }]}>{actionError}</Text> : null}
           <View style={styles.sheetActions}>
             {notice ? <Button label="지금 공지 내리기" variant="danger" stretch onPress={handleClearNotice} /> : null}
             <Button label="올리기" stretch onPress={handlePostNotice} />
@@ -471,6 +490,7 @@ export default function ChatScreen() {
                 <Text style={[Type.body, { color: theme.ink }]}>{selected.message}</Text>
               </View>
             ) : null}
+            {actionError ? <Text style={[Type.label, { color: theme.danger }]}>{actionError}</Text> : null}
             <View style={styles.sheetActions}>
               {canBlind ? (
                 <Button
