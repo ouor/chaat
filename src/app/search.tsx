@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -53,7 +53,12 @@ export default function SearchScreen() {
     }, []),
   );
 
+  // Bumped whenever the result list is replaced (new query or retry), so a "load more" page
+  // that was in flight for the previous list is dropped instead of appended to the new one.
+  const listGen = useRef(0);
+
   useEffect(() => {
+    listGen.current += 1;
     if (!query) {
       const t = setTimeout(() => {
         setResults([]);
@@ -92,8 +97,10 @@ export default function SearchScreen() {
   function loadMore() {
     if (!query || !nextOffset || loadingMore || initialLoading) return;
     setLoadingMore(true);
+    const gen = listGen.current;
     searchChannels(query, { size: PAGE_SIZE, offset: nextOffset })
       .then((res: SearchResult) => {
+        if (gen !== listGen.current) return;
         setResults((prev) => [...prev, ...res.data]);
         setNextOffset(res.nextOffset);
       })
