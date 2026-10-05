@@ -89,15 +89,18 @@ export default function ChatScreen() {
 
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const atBottom = useRef(true);
-  const prevCount = useRef(0);
+  const lastNewest = useRef<ChatMessage | null>(null);
 
+  // Count arrivals by how far the previous newest message moved, not by list length:
+  // once the store caps the list at MAX_MESSAGES the length stops changing.
   useEffect(() => {
-    const n = data.length;
-    if (n === prevCount.current) return;
-    const delta = n - prevCount.current;
-    prevCount.current = n;
-    if (!atBottom.current && delta > 0) setUnread((u) => u + delta);
-  }, [data.length]);
+    const prev = lastNewest.current;
+    lastNewest.current = data[0] ?? null;
+    if (!prev || atBottom.current) return;
+    const idx = data.indexOf(prev);
+    const delta = idx === -1 ? data.length : idx;
+    if (delta > 0) setUnread((u) => u + delta);
+  }, [data]);
 
   function onScroll(e: {
     nativeEvent: { contentOffset: { y: number } };
