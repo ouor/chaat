@@ -14,6 +14,7 @@ const PATHS: Record<IconName, (color: string) => React.ReactNode> = {
   chevron: (c) => line(c, 'M9 6l6 6-6 6'),
   down: (c) => line(c, 'M12 5v14M6 13l6 6 6-6'),
   close: (c) => line(c, 'M6 6l12 12M18 6L6 18'),
+  check: (c) => line(c, 'M5 12.5l4.5 4.5L19 7.5'),
   search: (c) => (
     <>
       <Circle cx="11" cy="11" r="7" stroke={c} strokeWidth={STROKE} fill="none" />
@@ -59,6 +60,7 @@ export type IconName =
   | 'chevron'
   | 'down'
   | 'close'
+  | 'check'
   | 'search'
   | 'gear'
   | 'star'

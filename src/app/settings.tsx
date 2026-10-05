@@ -77,7 +77,7 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + Spacing.xxxl }]}>
         <View style={[styles.account, { backgroundColor: theme.canvasSoft }]}>
           <View style={[styles.accountIcon, { backgroundColor: theme.canvasSoft2 }]}>
-            <Icon name="lock" color={theme.body} size={20} />
+            <Icon name={loggedIn ? 'check' : 'lock'} color={theme.body} size={20} />
           </View>
           <View style={styles.accountInfo}>
             <Text style={[Type.bodyStrong, { color: theme.ink }]}>
@@ -137,14 +137,14 @@ export default function SettingsScreen() {
 
         <Card
           title="채팅 기록"
-          description="본 채팅은 이 폰에 자동으로 저장돼요. 채팅방 오른쪽 위 시계 버튼을 누르면 다시 볼 수 있어요.">
+          description="채팅방을 열어 둔 동안 올라온 채팅이 이 폰에 자동으로 저장돼요. 채팅방 오른쪽 위 '지난 채팅'을 누르면 다시 볼 수 있어요.">
           <Field label="보관 기간">
             <Segmented<RetentionDays>
               options={[
                 { label: '7일', value: 7 },
                 { label: '30일', value: 30 },
                 { label: '90일', value: 90 },
-                { label: '계속', value: 0 },
+                { label: '무제한', value: 0 },
               ]}
               value={settings.retentionDays}
               onSelect={(v) => {
