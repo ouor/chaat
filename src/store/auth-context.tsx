@@ -52,6 +52,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
       return true;
     } catch {
       return false;
+    } finally {
+      // The WebView store is a plaintext file and also the native WebSocket cookie jar: once the
+      // session is in the keychain (or rejected), nothing else may keep a copy.
+      await clearWebViewCookies();
     }
   }, []);
 
