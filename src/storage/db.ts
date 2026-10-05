@@ -18,9 +18,25 @@ CREATE TABLE IF NOT EXISTS messages (
   extras_json TEXT,
   created_at INTEGER
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_dedup ON messages (channel_id, msg_time, message);
 `);
+  await migrate(db);
   return db;
+}
+
+// Schema versions, tracked in PRAGMA user_version.
+// 1: the dedup key includes the sender. (channel, time, text) alone made INSERT OR IGNORE drop a
+//    real message whenever two users sent the same text in the same millisecond ("ㅋㅋㅋ" waves).
+//    The new key is strictly wider, so building it over existing rows cannot conflict.
+async function migrate(db: SQLite.SQLiteDatabase): Promise<void> {
+  const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  const version = row?.user_version ?? 0;
+  if (version < 1) {
+    await db.execAsync(`
+DROP INDEX IF EXISTS idx_messages_dedup;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_dedup_v1 ON messages (channel_id, msg_time, user_id_hash, message);
+PRAGMA user_version = 1;
+`);
+  }
 }
 
 export function getDb(): Promise<SQLite.SQLiteDatabase> {
