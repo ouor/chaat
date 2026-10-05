@@ -86,7 +86,8 @@ export function getLiveStatus(channelId: string): Promise<LiveStatus> {
 }
 
 export function getChannel(channelId: string): Promise<ChannelDetail> {
-  return get<{ channel: ChannelDetail }>(SERVICE_BASE, `/service/v1/channels/${channelId}`, {}).then((c) => c.channel);
+  // content IS the channel (verified against a raw response), not wrapped in { channel }.
+  return get<ChannelDetail>(SERVICE_BASE, `/service/v1/channels/${channelId}`, {});
 }
 
 export function getAccessToken(chatChannelId: string, cookie?: string): Promise<AccessToken> {
