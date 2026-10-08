@@ -11,6 +11,7 @@ import { Radius, Spacing, Type } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
 import type { NaverCookies } from '@/store/auth-context';
+import { isNaverUrl, urlHost } from '@/store/naver-url';
 
 // Reassurance for people wary of signing in through an app they don't know yet.
 const POINTS: { icon: IconName; title: string; body: string }[] = [
@@ -22,11 +23,8 @@ const POINTS: { icon: IconName; title: string; body: string }[] = [
 // The login WebView is a trust boundary: session cookies are read only from the native cookie
 // store (NID_AUT is HttpOnly, so page JS never sees it and nothing a page posts is trusted), and
 // top-level navigation is kept on https *.naver.com so no other page can sit inside the login screen.
-const NAVER_URL = /^https:\/\/([a-z0-9-]+\.)*naver\.com(?:[/:?#]|$)/i;
-
-function hostOf(url: string): string {
-  return /^[a-z]+:\/\/([^/?#:]+)/i.exec(url)?.[1] ?? '';
-}
+// Subframes (captcha etc.) may load web content, but never hand off to other apps (intent:, ...).
+const SUBFRAME_URL = /^(https:|about:|data:|blob:)/i;
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -39,6 +37,7 @@ export default function LoginScreen() {
   const [busy, setBusy] = useState(false);
   const [host, setHost] = useState('nid.naver.com');
   const doneRef = useRef(false);
+  const webRef = useRef<WebView>(null);
   // A ref, not the `busy` state: the 2s poll closure is created once and would only ever see busy=false.
   const busyRef = useRef(false);
   // If the user backs out while login() is in flight, finishing must not pop another screen.
@@ -156,10 +155,20 @@ export default function LoginScreen() {
       ) : (
         <View style={styles.webviewWrap}>
           <WebView
+            ref={webRef}
             source={{ uri: 'https://nid.naver.com/nidlogin.login' }}
-            originWhitelist={['https://*']}
-            onShouldStartLoadWithRequest={(req) => !req.isTopFrame || NAVER_URL.test(req.url)}
-            onNavigationStateChange={(nav) => setHost(hostOf(nav.url))}
+            // '*' so every URL reaches the check below; a narrower list makes the WebView hand
+            // non-matching URLs (intent:, other apps' schemes) straight to Linking.openURL.
+            originWhitelist={['*']}
+            onShouldStartLoadWithRequest={(req) => (req.isTopFrame ? isNaverUrl(req.url) : SUBFRAME_URL.test(req.url))}
+            // The check above is skipped for POST navigations and fails open when JS is slow, so
+            // also stop any top-level page that isn't Naver once it starts loading.
+            onLoadStart={({ nativeEvent }) => {
+              if (isNaverUrl(nativeEvent.url)) return;
+              webRef.current?.stopLoading();
+              setPhase('fail');
+            }}
+            onNavigationStateChange={(nav) => setHost(urlHost(nav.url))}
             onLoadEnd={() => setLoading(false)}
             style={styles.webview}
           />
