@@ -9,9 +9,12 @@ interface AuthState {
   cookie?: string;
   uid?: string;
   login: (cookies: NaverCookies) => Promise<boolean>;
-  logout: () => Promise<void>;
+  /** False if the saved session couldn't be removed (still signed in; try again). */
+  logout: () => Promise<boolean>;
   /** Naver session cookies the login WebView has received so far (null until signed in there). */
   readWebViewSession: () => Promise<NaverCookies | null>;
+  /** The login screen was left without signing in: drop whatever the WebView received. */
+  cancelLogin: () => Promise<void>;
 }
 
 export type { NaverCookies };
@@ -19,8 +22,9 @@ export type { NaverCookies };
 const AuthContext = createContext<AuthState>({
   loggedIn: false,
   login: async () => false,
-  logout: async () => undefined,
+  logout: async () => false,
   readWebViewSession: async () => null,
+  cancelLogin: async () => undefined,
 });
 
 export function AuthProvider({ children }: PropsWithChildren) {
@@ -30,7 +34,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
     let cancelled = false;
     const t = setTimeout(async () => {
       const cookies = await loadNaverCookies();
-      if (!cookies) return;
+      if (!cookies) {
+        // A login left half-way (app killed before it finished) can leave NID cookies in the
+        // plaintext WebView store; with no saved session, nothing should be there.
+        await clearWebViewCookies();
+        return;
+      }
       const cookie = `NID_AUT=${cookies.aut}; NID_SES=${cookies.ses}`;
       try {
         const status = await getUserStatus(cookie);
@@ -64,12 +73,24 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
   }, []);
 
-  const logout = useCallback(async (): Promise<void> => {
-    await Promise.all([clearNaverCookies(), clearWebViewCookies()]);
+  // Clears this phone only; the Naver session itself isn't revoked server-side.
+  const logout = useCallback(async (): Promise<boolean> => {
+    await clearWebViewCookies();
+    try {
+      await clearNaverCookies();
+    } catch {
+      return false;
+    }
     setState({ loggedIn: false });
+    return true;
   }, []);
 
-  return <AuthContext.Provider value={{ ...state, login, logout, readWebViewSession: readNaverCookiesFromWebView }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{ ...state, login, logout, readWebViewSession: readNaverCookiesFromWebView, cancelLogin: clearWebViewCookies }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthState {

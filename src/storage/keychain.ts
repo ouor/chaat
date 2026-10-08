@@ -53,14 +53,8 @@ export async function loadNaverCookies(): Promise<NaverCookies | null> {
   return null;
 }
 
+/** Throws if the keychain entry couldn't be removed: the session would come back next launch. */
 export async function clearNaverCookies(): Promise<void> {
-  if (keychain) {
-    try {
-      await keychain.resetGenericPassword({ service: SERVICE });
-      return;
-    } catch {
-      // fall through to memory
-    }
-  }
   mem.delete(SERVICE);
+  if (keychain) await keychain.resetGenericPassword({ service: SERVICE });
 }

@@ -47,6 +47,7 @@ export default function SettingsScreen() {
   const settings = useSettings();
   const [logCount, setLogCount] = useState<number | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [logoutFailed, setLogoutFailed] = useState(false);
 
   const refreshCount = useCallback(() => {
     void countSavedChats().then(setLogCount);
@@ -72,11 +73,25 @@ export default function SettingsScreen() {
             </Text>
           </View>
           {loggedIn ? (
-            <Button label="로그아웃" size="sm" variant="secondary" onPress={logout} />
+            <Button
+              label="로그아웃"
+              size="sm"
+              variant="secondary"
+              onPress={() => {
+                setLogoutFailed(false);
+                void logout().then((ok) => setLogoutFailed(!ok));
+              }}
+            />
           ) : (
             <Button label="로그인" size="sm" onPress={() => router.push('/login')} />
           )}
         </View>
+
+        {logoutFailed ? (
+          <Text style={[Type.micro, styles.logoutError, { color: theme.danger }]}>
+            로그아웃하지 못했어요. 잠시 뒤 다시 눌러 주세요.
+          </Text>
+        ) : null}
 
         <Card title="화면">
           <Field label="테마">
@@ -213,6 +228,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   accountInfo: { flex: 1, gap: 2 },
+  logoutError: { marginTop: -Spacing.xxl, paddingHorizontal: Spacing.xs },
   section: { gap: Spacing.sm },
   sectionTitle: { paddingHorizontal: Spacing.xs },
   sectionDesc: { paddingHorizontal: Spacing.xs, fontWeight: 400 },

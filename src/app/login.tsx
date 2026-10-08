@@ -30,7 +30,7 @@ export default function LoginScreen() {
   const router = useRouter();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { login, readWebViewSession } = useAuth();
+  const { login, readWebViewSession, cancelLogin } = useAuth();
 
   const [phase, setPhase] = useState<'idle' | 'webview' | 'fail'>('idle');
   const [loading, setLoading] = useState(true);
@@ -46,7 +46,11 @@ export default function LoginScreen() {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      // Left before finishing (back after Naver signed in, before the 2s poll picked it up): the
+      // NID cookies must not stay in the WebView store. An in-flight login() clears them itself.
+      if (!doneRef.current && !busyRef.current) void cancelLogin();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function tryLogin(cookies: NaverCookies): Promise<void> {
