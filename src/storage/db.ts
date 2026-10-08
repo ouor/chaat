@@ -29,6 +29,9 @@ CREATE TABLE IF NOT EXISTS messages (
 // 1: the dedup key includes the sender. (channel, time, text) alone made INSERT OR IGNORE drop a
 //    real message whenever two users sent the same text in the same millisecond ("ㅋㅋㅋ" waves).
 //    The new key is strictly wider, so building it over existing rows cannot conflict.
+// 2: blinds remembers which messages were hidden. A blanked row's dedup key (message '') no
+//    longer matches the original text, so a later copy (reconnect replay, a re-queued batch)
+//    would be stored again in full; inserts now check this table first.
 async function migrate(db: SQLite.SQLiteDatabase): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const version = row?.user_version ?? 0;
@@ -37,6 +40,19 @@ async function migrate(db: SQLite.SQLiteDatabase): Promise<void> {
 DROP INDEX IF EXISTS idx_messages_dedup;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_dedup_v1 ON messages (channel_id, msg_time, user_id_hash, message);
 PRAGMA user_version = 1;
+`);
+  }
+  if (version < 2) {
+    await db.execAsync(`
+CREATE TABLE IF NOT EXISTS blinds (
+  channel_id TEXT NOT NULL,
+  msg_time INTEGER NOT NULL,
+  user_id_hash TEXT NOT NULL,
+  PRIMARY KEY (channel_id, msg_time, user_id_hash)
+) WITHOUT ROWID;
+INSERT OR IGNORE INTO blinds SELECT channel_id, msg_time, user_id_hash FROM messages
+  WHERE type = 'blinded' AND msg_time IS NOT NULL AND user_id_hash IS NOT NULL;
+PRAGMA user_version = 2;
 `);
   }
 }

@@ -60,7 +60,8 @@ export function enqueueLog(channelId: string, m: ChatMessage): void {
 
 /**
  * A blinded message must not survive in the archive: blank it whether it is still buffered or
- * already written (the UPDATE is queued behind any in-flight flush by the write chain).
+ * already written (the UPDATE is queued behind any in-flight flush by the write chain), and
+ * remember it in `blinds` so a later copy of it is never stored again.
  */
 export function markLogBlinded(channelId: string, e: BlindEvent): void {
   for (const b of buffer) {
@@ -70,11 +71,16 @@ export function markLogBlinded(channelId: string, e: BlindEvent): void {
   }
   void serialWrite(async () => {
     await inWriteTransaction(async (conn) => {
+      const key = [channelId, e.messageTime, e.userIdHash];
+      await conn.runAsync('INSERT OR IGNORE INTO blinds (channel_id, msg_time, user_id_hash) VALUES (?,?,?)', key);
       await conn.runAsync(
         "UPDATE OR IGNORE messages SET message = '', type = 'blinded', extras_json = NULL WHERE channel_id = ? AND msg_time = ? AND user_id_hash = ?",
-        channelId,
-        e.messageTime,
-        e.userIdHash,
+        key,
+      );
+      // The UPDATE is skipped where a blanked copy already exists (same dedup key); drop the rest.
+      await conn.runAsync(
+        "DELETE FROM messages WHERE channel_id = ? AND msg_time = ? AND user_id_hash = ? AND type != 'blinded'",
+        key,
       );
     });
   }).catch(() => undefined);
@@ -93,8 +99,15 @@ async function writeBuffered(): Promise<void> {
   const batch = buffer.splice(0, buffer.length);
   try {
     await inWriteTransaction(async (conn) => {
+      // A row whose message was blinded earlier is stored blank (never in full), whatever copy
+      // of it this is: a re-queued batch from before the blind, or a reconnect's replay.
       const stmt = await conn.prepareAsync(
-        'INSERT OR IGNORE INTO messages (channel_id, chat_channel_id, user_id_hash, nickname, message, type, msg_time, extras_json, created_at) VALUES (?,?,?,?,?,?,?,?,?)',
+        `INSERT OR IGNORE INTO messages (channel_id, chat_channel_id, user_id_hash, nickname, message, type, msg_time, extras_json, created_at)
+         SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9
+         WHERE NOT EXISTS (SELECT 1 FROM blinds WHERE channel_id = ?1 AND msg_time = ?7 AND user_id_hash = ?3)
+         UNION ALL
+         SELECT ?1, ?2, ?3, ?4, '', 'blinded', ?7, NULL, ?9
+         WHERE EXISTS (SELECT 1 FROM blinds WHERE channel_id = ?1 AND msg_time = ?7 AND user_id_hash = ?3)`,
       );
       try {
         for (const { channelId, m } of batch) {
@@ -215,8 +228,13 @@ export async function countLogs(channelId?: string): Promise<number> {
 export function clearLogs(channelId?: string): Promise<void> {
   return serialWrite(async () => {
     await inWriteTransaction(async (conn) => {
-      if (channelId) await conn.runAsync('DELETE FROM messages WHERE channel_id = ?', channelId);
-      else await conn.runAsync('DELETE FROM messages');
+      if (channelId) {
+        await conn.runAsync('DELETE FROM messages WHERE channel_id = ?', channelId);
+        await conn.runAsync('DELETE FROM blinds WHERE channel_id = ?', channelId);
+      } else {
+        await conn.runAsync('DELETE FROM messages');
+        await conn.runAsync('DELETE FROM blinds');
+      }
     });
   });
 }
@@ -227,6 +245,7 @@ export function pruneLogs(days: number): Promise<void> {
     const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
     await inWriteTransaction(async (conn) => {
       await conn.runAsync('DELETE FROM messages WHERE msg_time < ?', cutoff);
+      await conn.runAsync('DELETE FROM blinds WHERE msg_time < ?', cutoff);
     });
   });
 }
