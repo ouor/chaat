@@ -102,15 +102,16 @@ export default function ChatScreen() {
 
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const atBottom = useRef(true);
-  const lastNewest = useRef<ChatMessage | null>(null);
+  const lastNewest = useRef<string | null>(null);
 
   // Count arrivals by how far the previous newest message moved, not by list length:
-  // once the store caps the list at MAX_MESSAGES the length stops changing.
+  // once the store caps the list at MAX_MESSAGES the length stops changing. Matched by key, not
+  // identity: a blinded row is replaced by a new object and would read as "everything is new".
   useEffect(() => {
     const prev = lastNewest.current;
-    lastNewest.current = data[0] ?? null;
+    lastNewest.current = data[0] ? chatKey(data[0]) : null;
     if (!prev || atBottom.current) return;
-    const idx = data.indexOf(prev);
+    const idx = data.findIndex((m) => chatKey(m) === prev);
     const delta = idx === -1 ? data.length : idx;
     if (delta > 0) setUnread((u) => u + delta);
   }, [data]);
@@ -295,6 +296,10 @@ export default function ChatScreen() {
       ) : null}
 
       <View style={styles.listArea}>
+        {/* ponytail: FlatList (RN core), not FlashList 2 as AGENTS.md rule 5 asks: FlashList 2's
+            recycler + maintainVisibleContentPosition misrendered here (blank rows, forced scroll
+            to the bottom). Rows are memoized and the list is capped (500 / 2000 while reading).
+            Upgrade path: retry FlashList 2 in a dev build with inverted-style chat. */}
         <FlatList
           ref={listRef}
           inverted
