@@ -56,7 +56,6 @@ export function useChatSession(
   const [chatChannelId, setChatChannelId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
-  const [streamingChannelId, setStreamingChannelId] = useState<string | null>(null);
   const [canModerate, setCanModerate] = useState(false);
   const emojiMap = useEmojiMap(channelId, auth.cookie);
   const [attempt, setAttempt] = useState(0);
@@ -119,9 +118,6 @@ export function useChatSession(
           getAccessToken: () => getAccessToken(cid, auth.cookie),
           uid: auth.uid,
           onMessage: (m) => {
-            if (typeof m.extras.streamingChannelId === 'string') {
-              setStreamingChannelId(m.extras.streamingChannelId);
-            }
             if (auth.uid && m.userIdHash === auth.uid && (m.role === 'streamer' || m.role === 'manager')) {
               setCanModerate(true);
             }
@@ -223,7 +219,9 @@ export function useChatSession(
     chatChannelId,
     messages,
     notice,
-    streamingChannelId,
+    // The room's own channel. Never taken from a chat's extras: senders control those, and this id
+    // goes into authenticated blind/notice requests.
+    streamingChannelId: chatChannelId ? channelId : null,
     canModerate,
     emojiMap,
     sendChat,
