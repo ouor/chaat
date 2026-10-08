@@ -177,9 +177,11 @@ export function useChatSession(
     if (!chatChannelId || !backgroundCollect) return;
     const start = () => {
       if (keeperRef.current || keeperStoppedRef.current) return;
-      keeperRef.current = startKeeper(titleRef.current, () => {
+      keeperRef.current = startKeeper(titleRef.current, (reason) => {
         keeperRef.current = null;
-        keeperStoppedRef.current = true;
+        // Ended (button, task swipe, system): stay off until the room is opened again. Handed to
+        // another room: start again on the next return to the app.
+        if (reason === 'ended') keeperStoppedRef.current = true;
         socketRef.current?.setForeground(AppState.currentState === 'active');
       });
       keeperRef.current?.onTick(() => {

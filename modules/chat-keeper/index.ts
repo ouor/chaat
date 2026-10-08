@@ -10,7 +10,7 @@ export interface KeeperMessage {
 }
 
 type ChatKeeperEvents = {
-  onStopRequested(): void;
+  onStopped(): void;
   onTick(): void;
 };
 
@@ -45,9 +45,12 @@ export function stopChatKeeper(): void {
   native?.stop();
 }
 
-/** The user tapped "그만 받기" on the notification; the service has already stopped. */
-export function onChatKeeperStopRequested(listener: () => void): EventSubscription | null {
-  return native?.addListener('onStopRequested', listener) ?? null;
+/**
+ * The service ended without the app stopping it: "그만 받기" on the notification, the task swiped
+ * away from recents, or the system. Not fired for stopChatKeeper().
+ */
+export function onChatKeeperStopped(listener: () => void): EventSubscription | null {
+  return native?.addListener('onStopped', listener) ?? null;
 }
 
 /**

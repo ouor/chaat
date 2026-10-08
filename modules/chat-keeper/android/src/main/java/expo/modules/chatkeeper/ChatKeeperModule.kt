@@ -59,6 +59,21 @@ class ChatKeeperModule : Module() {
     tickThread = null
   }
 
+  // Generation of the start this module is keeping; 0 when it isn't (stopped by the app). A service
+  // ending with the active generation ended on its own (button, task swipe, system) -> tell JS.
+  @Volatile private var activeGen = 0
+  private var nextGen = 0
+
+  private val ended: (Int) -> Unit = { gen ->
+    if (gen != 0 && gen == activeGen) {
+      activeGen = 0
+      ChatKeeperService.requested = false
+      stopTick()
+      finishTimersTask()
+      sendEvent("onStopped", emptyMap<String, Any?>())
+    }
+  }
+
   private fun finishTimersTask() {
     val rc = appContext.reactContext as? ReactContext ?: return
     UiThreadUtil.runOnUiThread {
@@ -70,18 +85,16 @@ class ChatKeeperModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("ChatKeeper")
 
-    Events("onStopRequested", "onTick")
+    Events("onStopped", "onTick")
 
     OnCreate {
-      ChatKeeperService.onStopRequested = {
-        stopTick()
-        finishTimersTask()
-        sendEvent("onStopRequested", emptyMap<String, Any?>())
-      }
+      ChatKeeperService.onEnded = ended
     }
 
     OnDestroy {
-      ChatKeeperService.onStopRequested = null
+      // A reloaded module may already have installed its own callback; only clear ours.
+      if (ChatKeeperService.onEnded === ended) ChatKeeperService.onEnded = null
+      activeGen = 0
       stopTick()
       finishTimersTask()
       appContext.reactContext?.let { ChatKeeperService.stop(it) }
@@ -92,7 +105,8 @@ class ChatKeeperModule : Module() {
     Function("start") { title: String ->
       ChatKeeperService.title = title
       ChatKeeperService.messages = emptyList()
-      ChatKeeperService.start(context)
+      activeGen = ++nextGen
+      ChatKeeperService.start(context, activeGen)
       startTimersTask()
       startTick()
     }
@@ -108,6 +122,7 @@ class ChatKeeperModule : Module() {
     }
 
     Function("stop") {
+      activeGen = 0
       ChatKeeperService.messages = emptyList()
       stopTick()
       finishTimersTask()

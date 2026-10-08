@@ -28,20 +28,25 @@ class ChatKeeperService : Service() {
     private const val ACTION_STOP = "expo.modules.chatkeeper.STOP"
     /** From the app (room closed / setting off). */
     private const val ACTION_SHUTDOWN = "expo.modules.chatkeeper.SHUTDOWN"
+    private const val EXTRA_GEN = "gen"
 
     // Written from the module (JS thread), read when (re)building the notification.
     @Volatile var title: String = ""
     @Volatile var messages: List<KeeperMessage> = emptyList()
     @Volatile var running = false
     // A start was sent and no stop yet; a stop with nothing started must not spin the service up.
-    @Volatile private var requested = false
+    @Volatile internal var requested = false
 
-    /** Set by the module; called when the user taps "그만 받기" on the notification. */
-    @Volatile var onStopRequested: (() -> Unit)? = null
+    /**
+     * Set by the module. Called (main thread) whenever a service instance is destroyed, with the
+     * generation of the last start it handled: the app's own stop, "그만 받기", the task being
+     * swiped away, or the system. The module tells them apart by generation.
+     */
+    @Volatile var onEnded: ((Int) -> Unit)? = null
 
-    fun start(context: Context) {
+    fun start(context: Context, gen: Int) {
       requested = true
-      val intent = Intent(context, ChatKeeperService::class.java)
+      val intent = Intent(context, ChatKeeperService::class.java).putExtra(EXTRA_GEN, gen)
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)
       else context.startService(intent)
     }
@@ -138,14 +143,14 @@ class ChatKeeperService : Service() {
   }
 
   private var wakeLock: PowerManager.WakeLock? = null
+  private var startedGen = 0
 
   override fun onBind(intent: Intent?): IBinder? = null
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     when (intent?.action) {
       ACTION_STOP -> {
-        requested = false
-        onStopRequested?.invoke()
+        // Reported to the app through onDestroy -> onEnded.
         stopSelf()
         return START_NOT_STICKY
       }
@@ -155,6 +160,7 @@ class ChatKeeperService : Service() {
         return START_NOT_STICKY
       }
     }
+    startedGen = intent?.getIntExtra(EXTRA_GEN, 0) ?: 0
     val notification = build(this)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
       startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
@@ -179,6 +185,7 @@ class ChatKeeperService : Service() {
     running = false
     wakeLock?.let { if (it.isHeld) it.release() }
     wakeLock = null
+    onEnded?.invoke(startedGen)
     super.onDestroy()
   }
 }

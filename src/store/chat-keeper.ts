@@ -8,7 +8,7 @@ import { ANONYMOUS_DONOR } from '@/constants/chat-text';
 
 import {
   isChatKeeperAvailable,
-  onChatKeeperStopRequested,
+  onChatKeeperStopped,
   onChatKeeperTick,
   startChatKeeper,
   stopChatKeeper,
@@ -60,16 +60,27 @@ export interface ChatKeeper {
   stop: () => void;
 }
 
+/**
+ * Why a keeper stopped without its owner asking:
+ * - 'ended': the service ended ("그만 받기", task swiped away, system); don't restart this visit.
+ * - 'handover': another room took the one service over; may start again when it's free.
+ */
+export type KeeperStopReason = 'ended' | 'handover';
+
 // One service, so one keeper: opening another room hands the service over to it.
-let current: { stop: () => void } | null = null;
+let current: { stop: () => void; onStopped: (reason: KeeperStopReason) => void } | null = null;
 
 /**
  * Starts keeping the room alive. Must run while the app is in the foreground (Android forbids
- * starting the service from the background). `onStopped` fires when the user taps "그만 받기".
+ * starting the service from the background). `onStopped` fires when it stops on its own.
  */
-export function startKeeper(title: string, onStopped: () => void): ChatKeeper | null {
+export function startKeeper(title: string, onStopped: (reason: KeeperStopReason) => void): ChatKeeper | null {
   if (!isChatKeeperAvailable) return null;
-  current?.stop();
+  if (current) {
+    const prev = current;
+    prev.stop();
+    prev.onStopped('handover');
+  }
 
   let lines: KeeperMessage[] = [];
   let shownTitle = title;
@@ -96,12 +107,12 @@ export function startKeeper(title: string, onStopped: () => void): ChatKeeper | 
     stopChatKeeper();
     if (current === handle) current = null;
   };
-  const sub = onChatKeeperStopRequested(() => {
+  const sub = onChatKeeperStopped(() => {
     if (stopped) return;
     stop();
-    onStopped();
+    onStopped('ended');
   });
-  const handle = { stop };
+  const handle = { stop, onStopped };
   current = handle;
 
   void askNotificationPermission();
