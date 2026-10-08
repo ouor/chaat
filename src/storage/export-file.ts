@@ -25,6 +25,12 @@ export async function writeExportFile(baseName: string, ext: string, chunks: Asy
   return file.uri;
 }
 
+/** Deletes the last export (it holds strangers' nicknames and chat; kept only until replaced). */
+export function clearExports(): void {
+  const dir = new Directory(Paths.cache, EXPORT_DIR);
+  if (dir.exists) dir.delete();
+}
+
 /** Opens the system share sheet (save to Files/Drive, send to a messenger, ...). */
 export async function shareFile(uri: string, mimeType: string, dialogTitle: string): Promise<void> {
   if (!(await Sharing.isAvailableAsync())) throw new Error('sharing unavailable');

@@ -79,7 +79,12 @@ export function getWriteDb(): Promise<SQLite.SQLiteDatabase> {
   if (Platform.OS === 'web') return getDb();
   if (!writeDbPromise) {
     writeDbPromise = getDb()
-      .then(() => SQLite.openDatabaseAsync('chaat.db', { useNewConnection: true }))
+      .then(async () => {
+        const db = await SQLite.openDatabaseAsync('chaat.db', { useNewConnection: true });
+        // Deleted chats are zeroed on disk, not left in free pages ("모두 지우기" means gone).
+        await db.execAsync('PRAGMA secure_delete = ON;');
+        return db;
+      })
       .catch((e: unknown) => {
         writeDbPromise = null;
         throw e;

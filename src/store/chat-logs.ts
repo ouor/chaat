@@ -1,7 +1,7 @@
 // Store-side access to the on-device chat archive. Screens go through here instead of the
 // storage layer (AGENTS.md rule 2), so archive policy (retention, what a "saved chat" row is)
 // has one home.
-import { shareFile, writeExportFile } from '@/storage/export-file';
+import { clearExports, shareFile, writeExportFile } from '@/storage/export-file';
 import { clearLogs, countLogs, eachLog, getLogs, LOG_LIMIT, pruneLogs, type LogRow } from '@/storage/log-repo';
 
 import { CSV_BOM, csvHeader, csvLine } from './chat-csv';
@@ -17,8 +17,14 @@ export function countSavedChats(): Promise<number> {
   return countLogs();
 }
 
-export function clearSavedChats(): Promise<void> {
-  return clearLogs();
+/** Every saved chat, plus the last exported CSV still in the app cache. */
+export async function clearSavedChats(): Promise<void> {
+  await clearLogs();
+  try {
+    clearExports();
+  } catch {
+    // Cache folder already gone or unavailable (web); nothing left to remove.
+  }
 }
 
 /** Drops rows older than the retention window (0 = keep forever). */

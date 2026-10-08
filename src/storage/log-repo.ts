@@ -226,6 +226,10 @@ export async function countLogs(channelId?: string): Promise<number> {
 }
 
 export function clearLogs(channelId?: string): Promise<void> {
+  // Rows still waiting in the buffer would be written right back after the delete.
+  for (let i = buffer.length - 1; i >= 0; i--) {
+    if (!channelId || buffer[i].channelId === channelId) buffer.splice(i, 1);
+  }
   return serialWrite(async () => {
     await inWriteTransaction(async (conn) => {
       if (channelId) {
@@ -236,6 +240,9 @@ export function clearLogs(channelId?: string): Promise<void> {
         await conn.runAsync('DELETE FROM blinds');
       }
     });
+    // The WAL still holds the deleted pages' old contents until a checkpoint; fold and truncate it.
+    const conn = await getWriteDb();
+    await conn.execAsync('PRAGMA wal_checkpoint(TRUNCATE);');
   });
 }
 
