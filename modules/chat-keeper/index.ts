@@ -17,6 +17,7 @@ type ChatKeeperEvents = {
 declare class ChatKeeperNative extends NativeModule<ChatKeeperEvents> {
   start(title: string): void;
   update(title: string, messages: KeeperMessage[]): Promise<void>;
+  heartbeat(): void;
   stop(): void;
 }
 
@@ -39,6 +40,11 @@ export function startChatKeeper(title: string): void {
 /** Replaces the notification's title and newest messages. */
 export function updateChatKeeper(title: string, messages: KeeperMessage[]): void {
   void native?.update(title, messages).catch(() => undefined);
+}
+
+/** Renews the service's CPU wake lock (30s lease); it lapses once JS stops calling this. */
+export function chatKeeperHeartbeat(): void {
+  native?.heartbeat();
 }
 
 export function stopChatKeeper(): void {

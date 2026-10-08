@@ -121,6 +121,10 @@ class ChatKeeperModule : Module() {
       ChatKeeperService.refresh(context)
     }
 
+    Function("heartbeat") {
+      ChatKeeperService.heartbeat()
+    }
+
     Function("stop") {
       activeGen = 0
       ChatKeeperService.messages = emptyList()

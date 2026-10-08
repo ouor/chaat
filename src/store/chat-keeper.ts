@@ -7,6 +7,7 @@ import type { ChatMessage } from '@/client/chzzk/types';
 import { ANONYMOUS_DONOR } from '@/constants/chat-text';
 
 import {
+  chatKeeperHeartbeat,
   isChatKeeperAvailable,
   onChatKeeperStopped,
   onChatKeeperTick,
@@ -21,6 +22,10 @@ export { isChatKeeperAvailable };
 // Notification shows the newest few; Android rate-limits rapid updates, so they're coalesced into
 // one update per native tick (1s).
 const SHOWN = 5;
+// A reconnect replays the last 50 chats; don't show the ones already shown as new again.
+const SEEN = 200;
+// Renew the native wake lock (30s lease) every this many ticks; each renewal is a binder call.
+const HEARTBEAT_TICKS = 10;
 
 /** A chat as one notification line, or null for what shouldn't be shown there. */
 export function keeperLine(m: ChatMessage): KeeperMessage | null {
@@ -88,8 +93,11 @@ export function startKeeper(title: string, onStopped: (reason: KeeperStopReason)
   let stopped = false;
   const tickListeners: (() => void)[] = [];
 
+  const seen = new Set<string>();
+  let ticks = 0;
   const tick = onChatKeeperTick(() => {
     if (stopped) return;
+    if (ticks++ % HEARTBEAT_TICKS === 0) chatKeeperHeartbeat();
     // While the app is on screen nobody reads the notification; skip the rebuild (it is caught up
     // on the first tick after the app is left).
     if (dirty && AppState.currentState !== 'active') {
@@ -128,6 +136,10 @@ export function startKeeper(title: string, onStopped: (reason: KeeperStopReason)
     push: (m) => {
       const line = keeperLine(m);
       if (!line || stopped) return;
+      const key = `${m.msgTime}:${m.userIdHash}:${m.message}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      if (seen.size > SEEN) seen.delete(seen.values().next().value as string);
       lines = [...lines, line].slice(-SHOWN);
       dirty = true;
     },

@@ -29,6 +29,16 @@ class ChatKeeperService : Service() {
     /** From the app (room closed / setting off). */
     private const val ACTION_SHUTDOWN = "expo.modules.chatkeeper.SHUTDOWN"
     private const val EXTRA_GEN = "gen"
+    // The wake lock lapses unless JS renews it (heartbeat every ~10s): if JS ever stops
+    // running, the CPU is released instead of being held until the task is cleaned up.
+    private const val WAKE_LOCK_MS = 30_000L
+
+    @Volatile private var instance: ChatKeeperService? = null
+
+    /** Called from JS each tick while it is alive and running. */
+    fun heartbeat() {
+      instance?.wakeLock?.let { if (it.isHeld) it.acquire(WAKE_LOCK_MS) }
+    }
 
     // Written from the module (JS thread), read when (re)building the notification.
     @Volatile var title: String = ""
@@ -108,8 +118,17 @@ class ChatKeeperService : Service() {
       val stop = PendingIntent.getService(context, 1, stopIntent, flags)
 
       val heading = title.ifEmpty { "채팅방" }
+      // Lock screen: strangers' chat (and which channel) stays hidden; only "receiving" shows.
+      val public =
+        (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Builder(context, CHANNEL_ID) else Notification.Builder(context))
+          .setSmallIcon(R.drawable.chat_keeper_icon)
+          .setContentTitle("chaat")
+          .setContentText("채팅을 받고 있어요")
+          .build()
       builder
         .setSmallIcon(R.drawable.chat_keeper_icon)
+        .setVisibility(Notification.VISIBILITY_PRIVATE)
+        .setPublicVersion(public)
         .setOngoing(true)
         .setOnlyAlertOnce(true)
         .setShowWhen(true)
@@ -142,10 +161,15 @@ class ChatKeeperService : Service() {
     }
   }
 
-  private var wakeLock: PowerManager.WakeLock? = null
+  internal var wakeLock: PowerManager.WakeLock? = null
   private var startedGen = 0
 
   override fun onBind(intent: Intent?): IBinder? = null
+
+  override fun onCreate() {
+    super.onCreate()
+    instance = this
+  }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     when (intent?.action) {
@@ -174,7 +198,7 @@ class ChatKeeperService : Service() {
       val power = getSystemService(Context.POWER_SERVICE) as PowerManager
       wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "chaat:chat-keeper").apply {
         setReferenceCounted(false)
-        acquire()
+        acquire(WAKE_LOCK_MS)
       }
     }
     // Not sticky: if the system kills the process, the JS session is gone too; nothing to resume.
@@ -182,6 +206,7 @@ class ChatKeeperService : Service() {
   }
 
   override fun onDestroy() {
+    if (instance === this) instance = null
     running = false
     wakeLock?.let { if (it.isHeld) it.release() }
     wakeLock = null
