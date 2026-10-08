@@ -109,7 +109,7 @@ export function pongMessage(): { cmd: number; ver: string } {
   return { cmd: Cmd.PONG, ver: '2' };
 }
 
-function isRecord(v: unknown): v is Record<string, unknown> {
+export function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null;
 }
 

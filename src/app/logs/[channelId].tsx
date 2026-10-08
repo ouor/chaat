@@ -80,7 +80,8 @@ export default function LogsScreen() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(false);
 
-  const title = name || favorites.find((f) => f.channelId === channelId)?.channelName || '지난 채팅';
+  // The name param can come from a deep link; prefer what the app already knows about the channel.
+  const title = favorites.find((f) => f.channelId === channelId)?.channelName || name || '지난 채팅';
   const entries = useMemo(() => groupByDate(rows), [rows]);
 
   useEffect(() => {

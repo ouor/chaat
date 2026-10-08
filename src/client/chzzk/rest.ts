@@ -1,4 +1,4 @@
-import { isTrustedImageUrl } from './protocol';
+import { isRecord, isTrustedImageUrl } from './protocol';
 import type { AccessToken, ChannelDetail, LiveStatus, SearchChannel, UserStatus } from './types';
 
 const SERVICE_BASE = 'https://api.chzzk.naver.com';
@@ -20,40 +20,50 @@ export class ChzzkApiError extends Error {
 // switch, NAT expiry) would leave a request pending forever and everything awaiting it stuck.
 const REQUEST_TIMEOUT_MS = 15000;
 
+// Response bodies are untrusted input: every endpoint below parses `content` (unknown) into its
+// type, checking what downstream code relies on, instead of casting.
+const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback);
+const num = (v: unknown, fallback = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
+const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+
+function unexpected(what: string): never {
+  throw new ChzzkApiError(`unexpected ${what} response`, -1);
+}
+
 function qs(params: Record<string, string | number>): string {
   const entries = Object.entries(params).filter(([, v]) => v !== undefined);
   if (entries.length === 0) return '';
   return '?' + entries.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
 }
 
-async function get<T>(
+async function get(
   base: string,
   path: string,
   params: Record<string, string | number>,
   cookie?: string,
-): Promise<T> {
-  return request<T>(base, path, { params, cookie });
+): Promise<unknown> {
+  return request(base, path, { params, cookie });
 }
 
-async function request<T>(
+async function request(
   base: string,
   path: string,
   opts: { params?: Record<string, string | number>; cookie?: string; method?: 'GET' | 'POST' | 'DELETE' | 'PUT'; body?: unknown } = {},
-): Promise<T> {
+): Promise<unknown> {
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), REQUEST_TIMEOUT_MS);
   try {
-    return await send<T>(base + path + qs(opts.params ?? {}), opts, abort.signal);
+    return await send(base + path + qs(opts.params ?? {}), opts, abort.signal);
   } finally {
     clearTimeout(timer);
   }
 }
 
-async function send<T>(
+async function send(
   url: string,
   opts: { cookie?: string; method?: 'GET' | 'POST' | 'DELETE' | 'PUT'; body?: unknown },
   signal: AbortSignal,
-): Promise<T> {
+): Promise<unknown> {
   const res = await fetch(url, {
     method: opts.method ?? 'GET',
     signal,
@@ -70,9 +80,10 @@ async function send<T>(
     },
     ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
   });
-  const body = (await res.json()) as { code: number; message: string; content: T };
+  const body: unknown = await res.json();
+  if (!isRecord(body)) unexpected('api');
   if (body.code !== 200) {
-    throw new ChzzkApiError(body.message || 'chzzk api error', body.code);
+    throw new ChzzkApiError(str(body.message) || 'chzzk api error', num(body.code, -1));
   }
   return body.content;
 }
@@ -82,14 +93,27 @@ async function send<T>(
 // crafted id can't steer an authenticated request to another API path.
 const CHANNEL_ID = /^[0-9a-f]{32}$/;
 
+/** A CHZZK channel id (32 hex chars). Route params from deep links are checked with this. */
+export function isChannelId(v: unknown): v is string {
+  return typeof v === 'string' && CHANNEL_ID.test(v);
+}
+
 function channelPath(channelId: string): string {
-  if (!CHANNEL_ID.test(channelId)) throw new ChzzkApiError('invalid channel id', 400);
+  if (!isChannelId(channelId)) throw new ChzzkApiError('invalid channel id', 400);
   return encodeURIComponent(channelId);
 }
 
 // Image URLs from REST go straight into <Image>; keep them on the CHZZK CDN like WS-sourced ones.
-function trustedChannel(c: ChannelDetail): ChannelDetail {
-  return isTrustedImageUrl(c.channelImageUrl) ? c : { ...c, channelImageUrl: '' };
+function parseChannel(v: unknown): ChannelDetail | null {
+  if (!isRecord(v) || typeof v.channelId !== 'string') return null;
+  return {
+    channelId: v.channelId,
+    channelName: str(v.channelName),
+    channelImageUrl: isTrustedImageUrl(v.channelImageUrl) ? v.channelImageUrl : '',
+    followerCount: num(v.followerCount),
+    verifiedMark: v.verifiedMark === true,
+    openLive: v.openLive === true,
+  };
 }
 
 export interface SearchResult {
@@ -101,42 +125,58 @@ export function searchChannels(
   keyword: string,
   opts: { size?: number; offset?: number } = {},
 ): Promise<SearchResult> {
-  return get<{ data: SearchChannel[]; page: { next: { offset: number } | null } }>(
-    SERVICE_BASE,
-    '/service/v1/search/channels',
-    {
-      keyword,
-      size: opts.size ?? 20,
-      offset: opts.offset ?? 0,
-    },
-  ).then((c) => ({
-    data: c.data.map((d) => ({ ...d, channel: trustedChannel(d.channel) })),
-    nextOffset: c.page.next?.offset ?? null,
-  }));
+  return get(SERVICE_BASE, '/service/v1/search/channels', {
+    keyword,
+    size: opts.size ?? 20,
+    offset: opts.offset ?? 0,
+  }).then((c) => {
+    if (!isRecord(c)) unexpected('search');
+    const data: SearchChannel[] = [];
+    for (const d of arr(c.data)) {
+      const channel = isRecord(d) ? parseChannel(d.channel) : null;
+      if (channel) data.push({ channel });
+    }
+    const next = isRecord(c.page) && isRecord(c.page.next) ? c.page.next.offset : null;
+    return { data, nextOffset: typeof next === 'number' ? next : null };
+  });
 }
 
 export async function getLiveStatus(channelId: string): Promise<LiveStatus> {
-  return get<LiveStatus>(SERVICE_BASE, `/polling/v2/channels/${channelPath(channelId)}/live-status`, {}).then((c) => ({
-    ...c,
-    // Validated here so nothing downstream opens a socket for a null/empty chat room id.
-    chatChannelId: typeof c.chatChannelId === 'string' && c.chatChannelId.length > 0 ? c.chatChannelId : null,
-  }));
+  return get(SERVICE_BASE, `/polling/v2/channels/${channelPath(channelId)}/live-status`, {}).then((c) => {
+    if (!isRecord(c)) unexpected('live-status');
+    return {
+      channelId,
+      status: c.status === 'OPEN' ? 'OPEN' : 'CLOSE',
+      concurrentUserCount: num(c.concurrentUserCount),
+      // Validated here so nothing downstream opens a socket for a null/empty chat room id.
+      chatChannelId: typeof c.chatChannelId === 'string' && c.chatChannelId.length > 0 ? c.chatChannelId : null,
+    };
+  });
 }
 
 export async function getChannel(channelId: string): Promise<ChannelDetail> {
   // content IS the channel (verified against a raw response), not wrapped in { channel }.
-  return get<ChannelDetail>(SERVICE_BASE, `/service/v1/channels/${channelPath(channelId)}`, {}).then(trustedChannel);
+  return get(SERVICE_BASE, `/service/v1/channels/${channelPath(channelId)}`, {}).then(
+    (c) => parseChannel(c) ?? unexpected('channel'),
+  );
 }
 
 export function getAccessToken(chatChannelId: string, cookie?: string): Promise<AccessToken> {
-  return get<AccessToken>(GAME_BASE, '/v1/chats/access-token', {
-    channelId: chatChannelId,
-    chatType: 'STREAMING',
-  }, cookie);
+  return get(GAME_BASE, '/v1/chats/access-token', { channelId: chatChannelId, chatType: 'STREAMING' }, cookie).then(
+    (c) => {
+      if (!isRecord(c) || typeof c.accessToken !== 'string' || !c.accessToken) unexpected('access-token');
+      return { accessToken: c.accessToken, extraToken: str(c.extraToken), realNameAuth: c.realNameAuth === true };
+    },
+  );
 }
 
+/** The user hash becomes the socket uid and gates sending; a session without one isn't signed in. */
 export function getUserStatus(cookie: string): Promise<UserStatus> {
-  return get<UserStatus>(GAME_BASE, '/v1/user/getUserStatus', {}, cookie);
+  return get(GAME_BASE, '/v1/user/getUserStatus', {}, cookie).then((c) => {
+    if (!isRecord(c)) unexpected('user-status');
+    const userIdHash = str(c.userIdHash);
+    return { userIdHash, loggedIn: c.loggedIn === true && userIdHash.length > 0 };
+  });
 }
 
 export interface NoticePayload {
@@ -147,7 +187,7 @@ export interface NoticePayload {
 }
 
 export async function postNotice(chatChannelId: string, cookie: string, p: NoticePayload): Promise<void> {
-  await request<void>(GAME_BASE, '/v1/chats/notices', {
+  await request(GAME_BASE, '/v1/chats/notices', {
     method: 'POST',
     cookie,
     body: { channelId: chatChannelId, chatType: 'STREAMING', ...p },
@@ -155,7 +195,7 @@ export async function postNotice(chatChannelId: string, cookie: string, p: Notic
 }
 
 export async function deleteNotice(chatChannelId: string, cookie: string, p: NoticePayload): Promise<void> {
-  await request<void>(GAME_BASE, '/v1/chats/notices', {
+  await request(GAME_BASE, '/v1/chats/notices', {
     method: 'DELETE',
     cookie,
     body: { channelId: chatChannelId, chatType: 'STREAMING', ...p },
@@ -163,7 +203,7 @@ export async function deleteNotice(chatChannelId: string, cookie: string, p: Not
 }
 
 export async function blindMessage(chatChannelId: string, cookie: string, p: NoticePayload): Promise<void> {
-  await request<void>(GAME_BASE, '/v1/chats/blind-message', {
+  await request(GAME_BASE, '/v1/chats/blind-message', {
     method: 'POST',
     cookie,
     body: { channelId: chatChannelId, chatType: 'STREAMING', ...p },
@@ -185,34 +225,59 @@ export interface ProfileCard {
 }
 
 export function getProfileCard(chatChannelId: string, userIdHash: string, cookie?: string): Promise<ProfileCard> {
-  return get<ProfileCard>(
+  return get(
     GAME_BASE,
     `/v1/chats/${encodeURIComponent(chatChannelId)}/users/${encodeURIComponent(userIdHash)}/profile-card`,
     { chatType: 'STREAMING' },
     cookie,
-  ).then((pc) => (isTrustedImageUrl(pc.profileImageUrl) ? pc : { ...pc, profileImageUrl: null }));
+  ).then((pc) => {
+    if (!isRecord(pc)) unexpected('profile-card');
+    // streamingProperty and its parts are optional/nullable in practice; the screen reads them.
+    const sp = isRecord(pc.streamingProperty) ? pc.streamingProperty : {};
+    const sub = isRecord(sp.subscription) ? sp.subscription : null;
+    const follow = isRecord(sp.following) ? sp.following : null;
+    const color = isRecord(sp.nicknameColor) ? sp.nicknameColor : null;
+    return {
+      userIdHash: str(pc.userIdHash, userIdHash),
+      nickname: str(pc.nickname),
+      profileImageUrl: isTrustedImageUrl(pc.profileImageUrl) ? pc.profileImageUrl : null,
+      userRoleCode: str(pc.userRoleCode),
+      verifiedMark: pc.verifiedMark === true,
+      activityBadges: arr(pc.activityBadges).flatMap((b) =>
+        isRecord(b)
+          ? [{ badgeId: str(b.badgeId), title: str(b.title), description: str(b.description), activated: b.activated === true }]
+          : [],
+      ),
+      streamingProperty: {
+        ...(sub ? { subscription: { accumulativeMonth: num(sub.accumulativeMonth), tierName: str(sub.tierName) } } : {}),
+        ...(follow && typeof follow.followDate === 'string' ? { following: { followDate: follow.followDate } } : {}),
+        ...(color && typeof color.colorCode === 'string' ? { nicknameColor: { colorCode: color.colorCode } } : {}),
+      },
+    };
+  });
 }
 
-export interface EmojiPack {
-  emojiPackId: string;
-  emojiPackName: string;
-  emojiPackLocked?: boolean;
-  emojis: { emojiId: string; imageUrl: string }[];
-  tier1Emojis?: { emojiId: string; imageUrl: string }[];
-  tier2Emojis?: { emojiId: string; imageUrl: string }[];
-}
-
-interface EmojiPacksContent {
-  emojiPacks: EmojiPack[];
-  cheatKeyEmojiPacks?: EmojiPack[];
-  subscriptionEmojiPacks?: EmojiPack[];
-}
+// Packs come in three lists, each pack holding up to three emoji lists; only id + an image on the
+// CHZZK CDN survive.
+const PACK_LISTS = ['emojiPacks', 'cheatKeyEmojiPacks', 'subscriptionEmojiPacks'] as const;
+const PACK_EMOJIS = ['emojis', 'tier1Emojis', 'tier2Emojis'] as const;
 
 export async function getEmojiPacks(channelId: string, cookie?: string): Promise<{ emojiId: string; imageUrl: string }[]> {
-  return get<EmojiPacksContent>(SERVICE_BASE, `/service/v1/channels/${channelPath(channelId)}/emoji-packs`, {}, cookie).then((c) => {
-    const all = [...c.emojiPacks, ...(c.cheatKeyEmojiPacks ?? []), ...(c.subscriptionEmojiPacks ?? [])];
-    return all
-      .flatMap((p) => [...p.emojis, ...(p.tier1Emojis ?? []), ...(p.tier2Emojis ?? [])])
-      .filter((e) => isTrustedImageUrl(e.imageUrl));
+  return get(SERVICE_BASE, `/service/v1/channels/${channelPath(channelId)}/emoji-packs`, {}, cookie).then((c) => {
+    if (!isRecord(c)) unexpected('emoji-packs');
+    const out: { emojiId: string; imageUrl: string }[] = [];
+    for (const list of PACK_LISTS) {
+      for (const pack of arr(c[list])) {
+        if (!isRecord(pack)) continue;
+        for (const key of PACK_EMOJIS) {
+          for (const e of arr(pack[key])) {
+            if (isRecord(e) && typeof e.emojiId === 'string' && isTrustedImageUrl(e.imageUrl)) {
+              out.push({ emojiId: e.emojiId, imageUrl: e.imageUrl });
+            }
+          }
+        }
+      }
+    }
+    return out;
   });
 }

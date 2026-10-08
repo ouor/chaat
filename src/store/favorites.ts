@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 
+import { isChannelId } from '@/client/chzzk/rest';
 import { kv } from '@/storage/kv';
 
 const KEY = 'favorites';
@@ -57,6 +58,8 @@ export function isFavorite(channelId: string): boolean {
 export function toggleFavorite(
   f: { channelId: string; channelName: string; channelImageUrl: string },
 ): boolean {
+  // The id may come from a deep link; never persist something that isn't a channel id.
+  if (!isChannelId(f.channelId)) return false;
   const list = read();
   const existing = list.find((x) => x.channelId === f.channelId);
   if (existing) {

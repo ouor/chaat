@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
-import { getAccessToken, getLiveStatus } from '@/client/chzzk/rest';
+import { getAccessToken, getLiveStatus, isChannelId } from '@/client/chzzk/rest';
 import { ChatSocket, type ConnState } from '@/client/chzzk/socket';
 import type { ChatMessage } from '@/client/chzzk/types';
 import { startKeeper, type ChatKeeper } from '@/store/chat-keeper';
@@ -99,6 +99,11 @@ export function useChatSession(
         setMessages([]);
         setLiveStatus(null);
         setNotice(null);
+      }
+      // Route params come from deep links (chaat://chat/<anything>): no request, no keeper.
+      if (!isChannelId(channelId)) {
+        setConnState('unavailable');
+        return;
       }
       setConnState('connecting');
       try {
