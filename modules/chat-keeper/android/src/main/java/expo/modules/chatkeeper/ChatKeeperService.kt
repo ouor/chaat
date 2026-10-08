@@ -24,24 +24,43 @@ class ChatKeeperService : Service() {
   companion object {
     private const val CHANNEL_ID = "chat_keeper"
     private const val NOTIFICATION_ID = 4201
+    /** From the notification's "그만 받기". */
     private const val ACTION_STOP = "expo.modules.chatkeeper.STOP"
+    /** From the app (room closed / setting off). */
+    private const val ACTION_SHUTDOWN = "expo.modules.chatkeeper.SHUTDOWN"
 
     // Written from the module (JS thread), read when (re)building the notification.
     @Volatile var title: String = ""
     @Volatile var messages: List<KeeperMessage> = emptyList()
     @Volatile var running = false
+    // A start was sent and no stop yet; a stop with nothing started must not spin the service up.
+    @Volatile private var requested = false
 
     /** Set by the module; called when the user taps "그만 받기" on the notification. */
     @Volatile var onStopRequested: (() -> Unit)? = null
 
     fun start(context: Context) {
+      requested = true
       val intent = Intent(context, ChatKeeperService::class.java)
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)
       else context.startService(intent)
     }
 
+    /**
+     * Queued as a command rather than stopService(): stopping a service started with
+     * startForegroundService() before its onStartCommand reached startForeground() crashes the
+     * app (Android 9+). Commands run in order on the main thread, so this lands after the start.
+     */
     fun stop(context: Context) {
-      context.stopService(Intent(context, ChatKeeperService::class.java))
+      if (!requested) return
+      requested = false
+      val intent = Intent(context, ChatKeeperService::class.java).setAction(ACTION_SHUTDOWN)
+      try {
+        context.startService(intent)
+      } catch (e: IllegalStateException) {
+        // Background start not allowed: the service isn't running in the foreground anyway.
+        context.stopService(Intent(context, ChatKeeperService::class.java))
+      }
     }
 
     /** Re-posts the notification with the current title/messages; no-op when not running. */
@@ -120,10 +139,18 @@ class ChatKeeperService : Service() {
   override fun onBind(intent: Intent?): IBinder? = null
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-    if (intent?.action == ACTION_STOP) {
-      onStopRequested?.invoke()
-      stopSelf()
-      return START_NOT_STICKY
+    when (intent?.action) {
+      ACTION_STOP -> {
+        requested = false
+        onStopRequested?.invoke()
+        stopSelf()
+        return START_NOT_STICKY
+      }
+      ACTION_SHUTDOWN -> {
+        // Only if no newer start is queued behind this stop (quick room switch).
+        if (stopSelfResult(startId)) running = false
+        return START_NOT_STICKY
+      }
     }
     val notification = build(this)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
