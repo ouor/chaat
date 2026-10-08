@@ -7,6 +7,7 @@ class FakeWs {
   static all: FakeWs[] = [];
   readyState = FakeWs.OPEN;
   sent: string[] = [];
+  closed = false;
   onopen?: () => void;
   onclose?: () => void;
   onmessage?: (e: { data: string }) => void;
@@ -18,6 +19,7 @@ class FakeWs {
     this.sent.push(s);
   }
   close() {
+    this.closed = true;
     queueMicrotask(() => this.onclose?.());
   }
   drop() {
@@ -134,6 +136,8 @@ async function background() {
   last().onopen?.();
   last().receive(CONNECTED);
   sock.setForeground(false);
+  assert(last().closed, 'background drops the connection (nothing flushes it there)');
+  assert(sock.sendChat('hi') === false, 'send refused while suspended');
   last().drop();
   await sleep(1500);
   assert(count() === 1, 'no reconnect loop in background');

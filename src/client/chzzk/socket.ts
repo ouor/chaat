@@ -109,13 +109,19 @@ export class ChatSocket {
   }
 
   /**
-   * App foreground/background (wired by the store from AppState). In the background we stop the
-   * reconnect loop instead of fetching a token every 15s; on return we reconnect right away if the
-   * connection is gone or went silent (doze / network switch leave half-open sockets behind).
+   * App foreground/background (wired by the store from AppState; "active" also while the
+   * background keeper runs). In the background the connection is dropped: JS timers stop there,
+   * so nothing would flush what keeps arriving and it would pile up in memory until the app is
+   * killed. On return we reconnect right away (the recent-chat replay refills the gap), and also
+   * replace a connection that went silent (doze / network switch leave half-open sockets).
    */
   setForeground(active: boolean): void {
     this.background = !active;
-    if (!active || this.closed) return;
+    if (this.closed) return;
+    if (!active) {
+      this.suspend();
+      return;
+    }
     // Back in front: skip a pending backoff wait, and replace a connection that went silent.
     if (this.resumeOnForeground || this.reconnectTimer || this.isStale()) {
       this.resumeOnForeground = false;
@@ -295,6 +301,24 @@ export class ChatSocket {
     this.sid = undefined;
     this.connectedAt = 0;
     void this.openSocket();
+  }
+
+  /** Drops the connection (or an open in flight) until the next foreground. */
+  private suspend(): void {
+    this.gen += 1;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    const ws = this.ws;
+    this.ws = null;
+    ws?.close();
+    this.stopPing();
+    this.sid = undefined;
+    this.connectedAt = 0;
+    this.openingSince = 0;
+    this.resumeOnForeground = true;
+    this.setState('reconnecting');
   }
 
   private checkLiveness(): void {

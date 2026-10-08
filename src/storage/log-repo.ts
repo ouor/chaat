@@ -49,9 +49,14 @@ function startTimer(): void {
   });
 }
 
+// Flush without waiting for the timer once this many rows are queued: JS timers can stop (app in
+// the background), but writes are promise-driven and still run.
+const FLUSH_ROWS = 500;
+
 export function enqueueLog(channelId: string, m: ChatMessage): void {
   buffer.push({ channelId, m });
   startTimer();
+  if (buffer.length >= FLUSH_ROWS) void flush();
 }
 
 /**
