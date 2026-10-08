@@ -29,7 +29,8 @@ class FakeWs {
 }
 (globalThis as { WebSocket: unknown }).WebSocket = FakeWs;
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const realSetTimeout = setTimeout;
+const sleep = (ms: number) => new Promise((r) => realSetTimeout(r, ms));
 const assert = (cond: boolean, label: string) => {
   if (!cond) throw new Error(`socket check failed: ${label}`);
 };
@@ -121,10 +122,58 @@ async function background() {
   sock.close();
 }
 
+// Android stops JS timers in the background; pump() (driven by the native keeper tick) must do
+// the timers' work on its own: ping after silence, watchdog reconnect, and a due backoff reconnect.
+async function pumpWithoutTimers() {
+  const g = globalThis as unknown as Record<string, unknown>;
+  const saved = { setTimeout: g.setTimeout, setInterval: g.setInterval };
+  let fake = 0;
+  g.setTimeout = () => ++fake;
+  g.setInterval = () => ++fake;
+  try {
+    FakeWs.all = [];
+    const { sock, last, count } = makeSocket({ pingMs: 50, staleMs: 200, stableMs: 60000 });
+    sock.connect();
+    await sleep(0);
+    last().onopen?.();
+    last().receive(CONNECTED);
+
+    const sentBefore = last().sent.length;
+    sock.pump();
+    assert(last().sent.length === sentBefore, 'no ping before pingMs of silence');
+    await sleep(80);
+    sock.pump();
+    assert(last().sent.length === sentBefore + 1 && last().sent[sentBefore].includes(`"cmd":${Cmd.PING}`), 'pump pings after silence');
+    sock.pump();
+    assert(last().sent.length === sentBefore + 1, 'one ping per pingMs');
+
+    await sleep(220);
+    sock.pump();
+    await sleep(0);
+    assert(count() === 2, 'pump replaces a silent connection');
+
+    last().onopen?.();
+    last().receive(CONNECTED);
+    last().drop();
+    sock.pump();
+    await sleep(0);
+    assert(count() === 2, 'no reconnect before the backoff is due');
+    await sleep(1400);
+    sock.pump();
+    await sleep(0);
+    assert(count() === 3, 'pump runs the due reconnect');
+    sock.close();
+  } finally {
+    g.setTimeout = saved.setTimeout;
+    g.setInterval = saved.setInterval;
+  }
+}
+
 async function main() {
   await reconnectAndBackoff();
   await watchdog();
   await background();
+  await pumpWithoutTimers();
 }
 
 main()

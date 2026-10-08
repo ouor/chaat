@@ -7,7 +7,7 @@ import type { ChatMessage } from '@/client/chzzk/types';
 import { startKeeper, type ChatKeeper } from '@/store/chat-keeper';
 import { useEmojiMap } from '@/store/emoji-map';
 import { useSettings } from '@/store/settings';
-import { enqueueLog, markLogBlinded } from '@/storage/log-repo';
+import { enqueueLog, markLogBlinded, pumpLogs } from '@/storage/log-repo';
 
 const MAX_MESSAGES = 500;
 // While the user is scrolled up reading, trimming the oldest rows would delete what they're
@@ -71,6 +71,9 @@ export function useChatSession(
   const keeperRef = useRef<ChatKeeper | null>(null);
   const keeperStoppedRef = useRef(false);
   const titleRef = useRef(title);
+  // Does by hand what this room's timers would (UI commit, socket ping/reconnect); the keeper's
+  // tick calls it because JS timers stop in the background.
+  const pumpRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,6 +140,13 @@ export function useChatSession(
           onStateChange: setConnState,
         });
         socketRef.current = socket;
+        pumpRef.current = () => {
+          if (pending.length > 0) {
+            if (commitTimer) clearTimeout(commitTimer);
+            commit();
+          }
+          socket?.pump();
+        };
         socket.connect();
         if (AppState.currentState !== 'active' && !keeperRef.current) socket.setForeground(false);
       } catch {
@@ -149,6 +159,7 @@ export function useChatSession(
       if (commitTimer) clearTimeout(commitTimer);
       socket?.close();
       socketRef.current = null;
+      pumpRef.current = null;
     };
   }, [channelId, auth.cookie, auth.uid, attempt]);
 
@@ -168,6 +179,10 @@ export function useChatSession(
         keeperRef.current = null;
         keeperStoppedRef.current = true;
         socketRef.current?.setForeground(AppState.currentState === 'active');
+      });
+      keeperRef.current?.onTick(() => {
+        pumpRef.current?.();
+        pumpLogs();
       });
     };
     if (AppState.currentState === 'active') start();

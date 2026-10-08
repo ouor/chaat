@@ -1,4 +1,5 @@
 import { NativeModule, requireOptionalNativeModule } from 'expo';
+import { AppRegistry } from 'react-native';
 import type { EventSubscription } from 'expo-modules-core';
 
 export interface KeeperMessage {
@@ -10,6 +11,7 @@ export interface KeeperMessage {
 
 type ChatKeeperEvents = {
   onStopRequested(): void;
+  onTick(): void;
 };
 
 declare class ChatKeeperNative extends NativeModule<ChatKeeperEvents> {
@@ -22,6 +24,12 @@ declare class ChatKeeperNative extends NativeModule<ChatKeeperEvents> {
 const native = requireOptionalNativeModule<ChatKeeperNative>('ChatKeeper');
 
 export const isChatKeeperAvailable = native != null;
+
+// Must match TASK_KEY in ChatKeeperModule.kt. Native starts this headless task with the service so
+// RN keeps JS timers running in the background; it stays pending until native finishes it on stop
+// (resolving it would report the task done and pause timers again).
+const TASK_KEY = 'ChatKeeper';
+if (native) AppRegistry.registerHeadlessTask(TASK_KEY, () => () => new Promise<void>(() => {}));
 
 /** Starts the foreground service. Call while the app is in the foreground. */
 export function startChatKeeper(title: string): void {
@@ -40,4 +48,12 @@ export function stopChatKeeper(): void {
 /** The user tapped "그만 받기" on the notification; the service has already stopped. */
 export function onChatKeeperStopRequested(listener: () => void): EventSubscription | null {
   return native?.addListener('onStopRequested', listener) ?? null;
+}
+
+/**
+ * Fires every second while the service runs, from a native thread. JS timers stop once the app is
+ * in the background (Choreographer is paused), so background work is driven from this instead.
+ */
+export function onChatKeeperTick(listener: () => void): EventSubscription | null {
+  return native?.addListener('onTick', listener) ?? null;
 }

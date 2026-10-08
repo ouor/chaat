@@ -9,6 +9,7 @@ import { ANONYMOUS_DONOR } from '@/constants/chat-text';
 import {
   isChatKeeperAvailable,
   onChatKeeperStopRequested,
+  onChatKeeperTick,
   startChatKeeper,
   stopChatKeeper,
   updateChatKeeper,
@@ -17,9 +18,9 @@ import {
 
 export { isChatKeeperAvailable };
 
-// Notification shows the newest few; Android rate-limits rapid updates, so they're coalesced.
-const SHOWN = 8;
-const UPDATE_MS = 1000;
+// Notification shows the newest few; Android rate-limits rapid updates, so they're coalesced into
+// one update per native tick (1s).
+const SHOWN = 5;
 
 /** A chat as one notification line, or null for what shouldn't be shown there. */
 export function keeperLine(m: ChatMessage): KeeperMessage | null {
@@ -51,6 +52,11 @@ async function askNotificationPermission(): Promise<void> {
 export interface ChatKeeper {
   push: (m: ChatMessage) => void;
   setTitle: (title: string) => void;
+  /**
+   * Runs `fn` every second while keeping. JS timers stop once the app is in the background, so
+   * anything that must keep running there (socket ping/reconnect, log writes) hangs off this.
+   */
+  onTick: (fn: () => void) => void;
   stop: () => void;
 }
 
@@ -67,21 +73,24 @@ export function startKeeper(title: string, onStopped: () => void): ChatKeeper | 
 
   let lines: KeeperMessage[] = [];
   let shownTitle = title;
-  let timer: ReturnType<typeof setTimeout> | null = null;
+  let dirty = false;
   let stopped = false;
+  const tickListeners: (() => void)[] = [];
 
-  const flush = () => {
-    timer = null;
-    if (!stopped) updateChatKeeper(shownTitle, lines);
-  };
-  const schedule = () => {
-    timer ??= setTimeout(flush, UPDATE_MS);
-  };
+  const tick = onChatKeeperTick(() => {
+    if (stopped) return;
+    if (dirty) {
+      dirty = false;
+      updateChatKeeper(shownTitle, lines);
+    }
+    for (const fn of tickListeners) fn();
+  });
   const stop = () => {
     if (stopped) return;
     stopped = true;
-    if (timer) clearTimeout(timer);
+    tickListeners.length = 0;
     sub?.remove();
+    tick?.remove();
     stopChatKeeper();
     if (current === handle) current = null;
   };
@@ -107,12 +116,15 @@ export function startKeeper(title: string, onStopped: () => void): ChatKeeper | 
       const line = keeperLine(m);
       if (!line || stopped) return;
       lines = [...lines, line].slice(-SHOWN);
-      schedule();
+      dirty = true;
     },
     setTitle: (t) => {
       if (t === shownTitle || stopped) return;
       shownTitle = t;
-      schedule();
+      dirty = true;
+    },
+    onTick: (fn) => {
+      if (!stopped) tickListeners.push(fn);
     },
     stop,
   };

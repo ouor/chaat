@@ -65,6 +65,10 @@ export class ChatSocket {
   private background = false;
   private resumeOnForeground = false;
   private lastRx = 0;
+  /** Last non-PONG frame; the ping goes out after pingMs of this silence. */
+  private lastActivity = 0;
+  private lastPingAt = 0;
+  private reconnectAt = 0;
   private connectedAt = 0;
   /** Bumped on every open/drop so a stale async open or a dead socket's late events are ignored. */
   private gen = 0;
@@ -115,6 +119,26 @@ export class ChatSocket {
       this.resumeOnForeground = false;
       this.reconnectNow();
     }
+  }
+
+  /**
+   * Runs whatever the socket's own timers would have, for an outside clock to call when JS timers
+   * don't fire (Android stops them once the app is in the background). Each step checks its own
+   * deadline, so calling it while the timers do work changes nothing.
+   */
+  pump(): void {
+    if (this.closed) return;
+    const now = Date.now();
+    if (this.reconnectTimer && now >= this.reconnectAt) {
+      clearTimeout(this.reconnectTimer);
+      void this.openSocket();
+      return;
+    }
+    const quietSince = Math.max(this.lastActivity, this.lastPingAt);
+    if (this.ws?.readyState === WebSocket.OPEN && this.state === 'connected' && now - quietSince >= this.timing.pingMs) {
+      this.sendPing();
+    }
+    this.checkLiveness();
   }
 
   close(): void {
@@ -192,6 +216,7 @@ export class ChatSocket {
       this.ws?.send(JSON.stringify(pongMessage()));
     }
     if (cmd !== Cmd.PONG) {
+      this.lastActivity = this.lastRx;
       this.schedulePing();
     }
     const connected = parseConnected(raw);
@@ -245,6 +270,7 @@ export class ChatSocket {
     const base = Math.min(1000 * 2 ** this.retries, 15000);
     const delay = base * (0.75 + Math.random() * 0.5);
     this.retries += 1;
+    this.reconnectAt = Date.now() + delay;
     this.reconnectTimer = setTimeout(() => void this.openSocket(), delay);
   }
 
@@ -271,10 +297,13 @@ export class ChatSocket {
   private schedulePing(): void {
     this.stopPing();
     this.pingTimer = setInterval(() => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        this.send(JSON.stringify(pingMessage(this.opts.chatChannelId)));
-      }
+      if (this.ws?.readyState === WebSocket.OPEN) this.sendPing();
     }, this.timing.pingMs);
+  }
+
+  private sendPing(): void {
+    this.lastPingAt = Date.now();
+    this.send(JSON.stringify(pingMessage(this.opts.chatChannelId)));
   }
 
   private stopPing(): void {

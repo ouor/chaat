@@ -122,6 +122,11 @@ async function writeBuffered(): Promise<void> {
   }
 }
 
+/** Writes the buffer now if anything is waiting (for a caller-driven clock; see chat-keeper). */
+export function pumpLogs(): void {
+  if (buffer.length > 0) void flush();
+}
+
 export async function flushNow(): Promise<void> {
   if (flushing) await flushing;
   await flush();
