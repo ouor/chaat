@@ -69,6 +69,8 @@ export class ChatSocket {
   private lastActivity = 0;
   private lastPingAt = 0;
   private reconnectAt = 0;
+  /** When the current open started waiting on the token; 0 once a socket exists. */
+  private openingSince = 0;
   private connectedAt = 0;
   /** Bumped on every open/drop so a stale async open or a dead socket's late events are ignored. */
   private gen = 0;
@@ -144,6 +146,7 @@ export class ChatSocket {
   close(): void {
     this.closed = true;
     this.gen += 1;
+    this.openingSince = 0;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -173,6 +176,7 @@ export class ChatSocket {
   private async openSocket(): Promise<void> {
     this.reconnectTimer = null;
     const gen = ++this.gen;
+    this.openingSince = Date.now();
     this.setState(this.retries > 0 ? 'reconnecting' : 'connecting');
     let accTkn: string;
     try {
@@ -180,10 +184,14 @@ export class ChatSocket {
       accTkn = tokens.accessToken;
       this.extraToken = tokens.extraToken;
     } catch {
-      if (!this.closed && gen === this.gen) this.scheduleReconnect();
+      if (!this.closed && gen === this.gen) {
+        this.openingSince = 0;
+        this.scheduleReconnect();
+      }
       return;
     }
     if (this.closed || gen !== this.gen) return;
+    this.openingSince = 0;
     const ws = new WebSocket(socketUrl(this.opts.chatChannelId));
     this.ws = ws;
     this.lastRx = Date.now();
@@ -290,8 +298,19 @@ export class ChatSocket {
   }
 
   private checkLiveness(): void {
-    if (this.closed || this.background || !this.ws) return;
-    if (Date.now() - this.lastRx > this.timing.staleMs) this.reconnectNow();
+    if (this.closed || this.background) return;
+    const now = Date.now();
+    if (!this.ws) {
+      // Stuck before a socket exists (token request that never settles, e.g. its abort timer
+      // didn't fire because JS timers were paused): abandon that open and back off as a failure.
+      if (this.openingSince && now - this.openingSince > this.timing.staleMs) {
+        this.gen += 1;
+        this.openingSince = 0;
+        this.scheduleReconnect();
+      }
+      return;
+    }
+    if (now - this.lastRx > this.timing.staleMs) this.reconnectNow();
   }
 
   private schedulePing(): void {

@@ -36,20 +36,30 @@ const assert = (cond: boolean, label: string) => {
 };
 const CONNECTED = { cmd: Cmd.CONNECTED, bdy: { sid: 's' } };
 
-function makeSocket(timing: Partial<SocketTiming> = {}) {
+function makeSocket(timing: Partial<SocketTiming> = {}, hangFirstToken = false) {
   let tokens = 0;
   const states: string[] = [];
   const sock = new ChatSocket(
     {
       chatChannelId: 'abc',
       streamingChannelId: 'ch1',
-      getAccessToken: async () => ({ accessToken: `t${++tokens}`, extraToken: `x${tokens}` }),
+      getAccessToken: () => {
+        tokens += 1;
+        if (hangFirstToken && tokens === 1) return new Promise<never>(() => {});
+        return Promise.resolve({ accessToken: `t${tokens}`, extraToken: `x${tokens}` });
+      },
       onMessage: () => undefined,
       onStateChange: (st) => states.push(st),
     },
     timing,
   );
-  return { sock, states, last: () => FakeWs.all[FakeWs.all.length - 1], count: () => FakeWs.all.length };
+  return {
+    sock,
+    states,
+    last: () => FakeWs.all[FakeWs.all.length - 1],
+    count: () => FakeWs.all.length,
+    tokenCalls: () => tokens,
+  };
 }
 
 async function reconnectAndBackoff() {
@@ -102,6 +112,17 @@ async function watchdog() {
   // Half-open socket: no frames and no close event. The watchdog must replace it.
   await sleep(400);
   assert(count() >= 2, 'watchdog replaces a silent socket');
+  sock.close();
+}
+
+async function hungTokenRequest() {
+  FakeWs.all = [];
+  const { sock, count, tokenCalls } = makeSocket({ staleMs: 200, watchdogMs: 50 }, true);
+  sock.connect();
+  // The first token request never settles: the watchdog must give up on it and retry.
+  await sleep(1700);
+  assert(tokenCalls() >= 2, 'retries after a token request that never settles');
+  assert(count() >= 1, 'a later attempt opens a socket');
   sock.close();
 }
 
@@ -172,6 +193,7 @@ async function pumpWithoutTimers() {
 async function main() {
   await reconnectAndBackoff();
   await watchdog();
+  await hungTokenRequest();
   await background();
   await pumpWithoutTimers();
 }

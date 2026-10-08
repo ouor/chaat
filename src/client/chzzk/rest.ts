@@ -16,6 +16,10 @@ export class ChzzkApiError extends Error {
   }
 }
 
+// RN Android's OkHttp client has no connect/read timeouts, so a half-open connection (network
+// switch, NAT expiry) would leave a request pending forever and everything awaiting it stuck.
+const REQUEST_TIMEOUT_MS = 15000;
+
 function qs(params: Record<string, string | number>): string {
   const entries = Object.entries(params).filter(([, v]) => v !== undefined);
   if (entries.length === 0) return '';
@@ -36,8 +40,23 @@ async function request<T>(
   path: string,
   opts: { params?: Record<string, string | number>; cookie?: string; method?: 'GET' | 'POST' | 'DELETE' | 'PUT'; body?: unknown } = {},
 ): Promise<T> {
-  const res = await fetch(base + path + qs(opts.params ?? {}), {
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await send<T>(base + path + qs(opts.params ?? {}), opts, abort.signal);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function send<T>(
+  url: string,
+  opts: { cookie?: string; method?: 'GET' | 'POST' | 'DELETE' | 'PUT'; body?: unknown },
+  signal: AbortSignal,
+): Promise<T> {
+  const res = await fetch(url, {
     method: opts.method ?? 'GET',
+    signal,
     // Keep the shared native cookie jar (= login WebView store on Android) out of API calls:
     // with credentials, RN Android attaches the jar's NID cookies even when we pass none
     // (and OkHttp's jar header can win over ours). The explicit header below is the only auth.
