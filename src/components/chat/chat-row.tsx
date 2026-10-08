@@ -3,6 +3,7 @@ import { memo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { ChatMessage } from '@/client/chzzk/types';
+import { ANONYMOUS_DONOR, BLINDED_TEXT } from '@/constants/chat-text';
 import { Radius, Spacing, Type } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { useProfileImage } from '@/store/profile-images';
@@ -19,10 +20,6 @@ function nickKey(hash: string): (typeof NICKS)[number] {
   for (const ch of hash) n = (n * 31 + ch.charCodeAt(0)) | 0;
   return NICKS[Math.abs(n) % NICKS.length];
 }
-
-/** The official app's wording for donations sent without a nickname. */
-export const ANONYMOUS_DONOR = '익명의 후원자';
-export const BLINDED_TEXT = '가려진 메시지예요';
 
 function fmtTime(t: number): string {
   const d = new Date(t);

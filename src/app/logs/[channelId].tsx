@@ -2,17 +2,17 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { ANONYMOUS_DONOR, BLINDED_TEXT } from '@/components/chat/chat-row';
 import { EmojiText } from '@/components/chat/emoji-text';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { ScreenHeader } from '@/components/ui/screen-header';
+import { ANONYMOUS_DONOR, BLINDED_TEXT } from '@/constants/chat-text';
 import { Radius, Spacing, TOUCH, Type } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
 import { useEmojiMap } from '@/store/emoji-map';
 import { useFavorites } from '@/store/favorites';
-import { loadChatLogs, LOG_LIMIT, type LogRow } from '@/store/chat-logs';
+import { exportChatLogs, loadChatLogs, LOG_LIMIT, type LogRow } from '@/store/chat-logs';
 
 type Entry =
   | { kind: 'header'; label: string }
@@ -77,6 +77,8 @@ export default function LogsScreen() {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [hasAny, setHasAny] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(false);
 
   const title = name || favorites.find((f) => f.channelId === channelId)?.channelName || '지난 채팅';
   const entries = useMemo(() => groupByDate(rows), [rows]);
@@ -105,9 +107,56 @@ export default function LogsScreen() {
     }, [channelId, debouncedQuery]),
   );
 
+  // Exports what the list shows: the whole archive, or only the chats matching the search.
+  const onExport = async () => {
+    if (exporting) return;
+    setExporting(true);
+    setExportError(false);
+    try {
+      await exportChatLogs(channelId, title, debouncedQuery);
+    } catch {
+      setExportError(true);
+    } finally {
+      setExporting(false);
+    }
+  };
+  const canExport = rows.length > 0 && !exporting;
+  const searching = debouncedQuery.trim() !== '';
+
   return (
     <View style={[styles.root, { backgroundColor: theme.canvas }]}>
-      <ScreenHeader title={title} subtitle={rangeLabel(rows)} />
+      <ScreenHeader
+        title={title}
+        subtitle={rangeLabel(rows)}
+        right={
+          hasAny ? (
+            <Pressable
+              onPress={onExport}
+              disabled={!canExport}
+              accessibilityRole="button"
+              accessibilityLabel={searching ? '찾은 채팅을 CSV 파일로 내보내기' : '저장된 채팅을 CSV 파일로 내보내기'}
+              accessibilityState={{ disabled: !canExport, busy: exporting }}
+              hitSlop={4}
+              style={({ pressed }) => [
+                styles.exportButton,
+                { backgroundColor: pressed ? theme.canvasSoft2 : theme.canvasSoft, opacity: canExport ? 1 : 0.5 },
+              ]}>
+              {exporting ? (
+                <ActivityIndicator size="small" color={theme.body} />
+              ) : (
+                <Icon name="export" color={theme.body} size={16} />
+              )}
+              <Text style={[Type.micro, { color: theme.ink, fontWeight: 600 }]}>내보내기</Text>
+            </Pressable>
+          ) : null
+        }
+      />
+
+      {exportError ? (
+        <Text style={[Type.micro, styles.exportError, { color: theme.danger }]}>
+          파일을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.
+        </Text>
+      ) : null}
 
       {hasAny ? (
         <View style={[styles.searchWrap, { backgroundColor: theme.canvasSoft }]}>
@@ -128,6 +177,12 @@ export default function LogsScreen() {
             </Pressable>
           ) : null}
         </View>
+      ) : null}
+
+      {hasAny && searching && rows.length > 0 ? (
+        <Text style={[Type.micro, styles.scopeNote, { color: theme.mute }]}>
+          내보내기를 누르면 찾은 채팅만 파일로 저장돼요
+        </Text>
       ) : null}
 
       {loading ? (
@@ -238,6 +293,17 @@ const styles = StyleSheet.create({
   rowNickLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   rowNick: { flexShrink: 1, fontWeight: 600 },
   donoTag: { paddingHorizontal: 5, paddingVertical: 1, borderRadius: Radius.xs },
+  exportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    height: 34,
+    paddingHorizontal: Spacing.md,
+    marginRight: Spacing.xs,
+    borderRadius: Radius.pill,
+  },
+  scopeNote: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xs },
+  exportError: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xs },
   limitNote: { textAlign: 'center', paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md },
   center: {
     flex: 1,

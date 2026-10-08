@@ -52,6 +52,7 @@ const PATHS: Record<IconName, (color: string) => React.ReactNode> = {
       {line(c, 'M7 11V7a5 5 0 0 1 10 0v4')}
     </>
   ),
+  export: (c) => line(c, 'M4 13v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6M16 7l-4-4-4 4M12 3v12'),
   megaphone: (c) => line(c, 'M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13'),
 };
 
@@ -70,7 +71,8 @@ export type IconName =
   | 'moon'
   | 'phone'
   | 'lock'
-  | 'megaphone';
+  | 'megaphone'
+  | 'export';
 
 export function Icon({
   name,

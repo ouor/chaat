@@ -164,6 +164,18 @@ export function parseExtrasEmojis(extras: unknown): Record<string, string> | und
   return emojisFrom(parseExtras(extras));
 }
 
+function donationAmountFrom(extras: Record<string, unknown>): number | undefined {
+  const amount = extras.payAmount ?? extras.donationAmount;
+  if (typeof amount === 'number') return amount;
+  if (typeof amount === 'string') return Number(amount.replace(/[^\d]/g, '')) || undefined;
+  return undefined;
+}
+
+/** Donation amount (cheese) from a raw or stored extras value. */
+export function parseExtrasDonationAmount(extras: unknown): number | undefined {
+  return donationAmountFrom(parseExtras(extras));
+}
+
 function msgTypeFrom(code: unknown): MsgType {
   return (typeof code === 'number' && MSG_TYPE[code]) || 'text';
 }
@@ -197,13 +209,7 @@ function messageFromBdy(raw: Record<string, unknown>, chatChannelId: string): Ch
         ? bdy.messageTime
         : 0;
 
-  const amount = extras.payAmount ?? extras.donationAmount;
-  const donationAmount =
-    msgType === 'donation' && typeof amount === 'string'
-      ? Number(amount.replace(/[^\d]/g, '')) || undefined
-      : typeof amount === 'number'
-        ? amount
-        : undefined;
+  const donationAmount = msgType === 'donation' ? donationAmountFrom(extras) : undefined;
 
   return {
     chatChannelId,

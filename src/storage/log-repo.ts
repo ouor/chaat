@@ -164,6 +164,38 @@ export async function getLogs(channelId: string, query = ''): Promise<LogRow[]> 
   return rows.reverse().map(({ extras_json, ...row }) => ({ ...row, emojis: parseExtrasEmojis(extras_json) }));
 }
 
+export interface ExportRow {
+  nickname: string;
+  message: string;
+  type: string;
+  msg_time: number;
+  extras_json: string | null;
+}
+
+/**
+ * Every matching row, oldest first, with no LOG_LIMIT: streamed so a large archive is never held
+ * in memory at once. Same filter as getLogs, so an export matches what the search shows.
+ */
+export async function* eachLog(channelId: string, query = ''): AsyncGenerator<ExportRow> {
+  await flushNow();
+  const db = await getDb();
+  const q = query.trim().toLowerCase();
+  const rows = q
+    ? db.getEachAsync<ExportRow>(
+        `SELECT nickname, message, type, msg_time, extras_json FROM messages
+         WHERE channel_id = ? AND (instr(lower(message), ?) > 0 OR instr(lower(nickname), ?) > 0)
+         ORDER BY msg_time ASC`,
+        channelId,
+        q,
+        q,
+      )
+    : db.getEachAsync<ExportRow>(
+        'SELECT nickname, message, type, msg_time, extras_json FROM messages WHERE channel_id = ? ORDER BY msg_time ASC',
+        channelId,
+      );
+  yield* rows;
+}
+
 export async function countLogs(channelId?: string): Promise<number> {
   const db = await getDb();
   const row = await db.getFirstAsync<{ c: number }>(

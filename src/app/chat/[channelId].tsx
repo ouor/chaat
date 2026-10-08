@@ -15,7 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { ChatMessage } from '@/client/chzzk/types';
-import { ANONYMOUS_DONOR, ChatRow, ProfileThumb } from '@/components/chat/chat-row';
+import { ChatRow, ProfileThumb } from '@/components/chat/chat-row';
 import { ChannelAvatar } from '@/components/channel/channel-avatar';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,7 @@ import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { LiveBadge } from '@/components/ui/live-badge';
 import { ScreenHeader } from '@/components/ui/screen-header';
+import { ANONYMOUS_DONOR } from '@/constants/chat-text';
 import { Radius, Spacing, TOUCH, Type } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
