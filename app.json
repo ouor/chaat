@@ -38,7 +38,8 @@
           "imageWidth": 76
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "./plugins/with-no-data-transfer"
     ],
     "experiments": {
       "typedRoutes": true,
