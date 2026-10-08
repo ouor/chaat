@@ -137,9 +137,15 @@ export function useChatSession(
         });
         socketRef.current = socket;
         pumpRef.current = () => {
-          if (pending.length > 0) {
-            if (commitTimer) clearTimeout(commitTimer);
-            commit();
+          if (AppState.currentState === 'active') {
+            if (pending.length > 0) {
+              if (commitTimer) clearTimeout(commitTimer);
+              commit();
+            }
+          } else if (pending.length > MAX_MESSAGES) {
+            // Not on screen: don't re-render a hidden list every second; keep only what the list
+            // would show and let the commit timer apply it once the app is back.
+            pending = pending.slice(-MAX_MESSAGES);
           }
           socket?.pump();
         };

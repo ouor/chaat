@@ -1,6 +1,6 @@
 // Keeps the open chat room receiving after the app is left (Android foreground service), and
 // mirrors the newest chats into its notification like a messenger conversation.
-import { PermissionsAndroid, Platform } from 'react-native';
+import { AppState, PermissionsAndroid, Platform } from 'react-native';
 
 import { stripEmoji } from '@/client/chzzk/emoji';
 import type { ChatMessage } from '@/client/chzzk/types';
@@ -79,7 +79,9 @@ export function startKeeper(title: string, onStopped: () => void): ChatKeeper | 
 
   const tick = onChatKeeperTick(() => {
     if (stopped) return;
-    if (dirty) {
+    // While the app is on screen nobody reads the notification; skip the rebuild (it is caught up
+    // on the first tick after the app is left).
+    if (dirty && AppState.currentState !== 'active') {
       dirty = false;
       updateChatKeeper(shownTitle, lines);
     }

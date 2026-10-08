@@ -98,7 +98,8 @@ class ChatKeeperModule : Module() {
     }
 
     // Plain maps rather than a Record: called every second, and Records fall back to reflection.
-    Function("update") { title: String, messages: List<Map<String, Any?>> ->
+    // Async so building and posting the notification stays off the JS thread.
+    AsyncFunction("update") { title: String, messages: List<Map<String, Any?>> ->
       ChatKeeperService.title = title
       ChatKeeperService.messages = messages.map {
         KeeperMessage(it["nickname"] as? String ?: "", it["text"] as? String ?: "", (it["time"] as? Number)?.toLong() ?: 0L)

@@ -1,6 +1,8 @@
 import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+let writeDbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 async function init(): Promise<SQLite.SQLiteDatabase> {
   const db = await SQLite.openDatabaseAsync('chaat.db');
@@ -49,4 +51,23 @@ export function getDb(): Promise<SQLite.SQLiteDatabase> {
     });
   }
   return dbPromise;
+}
+
+/**
+ * Connection used only by the serialized writer (log-repo's write chain), opened once. Its own
+ * connection keeps reads on the main one from joining (and being rolled back with) a write
+ * transaction; reusing it avoids withExclusiveTransactionAsync's open/close of a fresh connection
+ * on every 1s flush. Web's expo-sqlite has one connection only.
+ */
+export function getWriteDb(): Promise<SQLite.SQLiteDatabase> {
+  if (Platform.OS === 'web') return getDb();
+  if (!writeDbPromise) {
+    writeDbPromise = getDb()
+      .then(() => SQLite.openDatabaseAsync('chaat.db', { useNewConnection: true }))
+      .catch((e: unknown) => {
+        writeDbPromise = null;
+        throw e;
+      });
+  }
+  return writeDbPromise;
 }

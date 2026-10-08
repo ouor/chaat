@@ -16,7 +16,7 @@ type ChatKeeperEvents = {
 
 declare class ChatKeeperNative extends NativeModule<ChatKeeperEvents> {
   start(title: string): void;
-  update(title: string, messages: KeeperMessage[]): void;
+  update(title: string, messages: KeeperMessage[]): Promise<void>;
   stop(): void;
 }
 
@@ -38,7 +38,7 @@ export function startChatKeeper(title: string): void {
 
 /** Replaces the notification's title and newest messages. */
 export function updateChatKeeper(title: string, messages: KeeperMessage[]): void {
-  native?.update(title, messages);
+  void native?.update(title, messages).catch(() => undefined);
 }
 
 export function stopChatKeeper(): void {

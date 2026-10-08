@@ -1,17 +1,16 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { AppState, Platform, type NativeEventSubscription } from 'react-native';
+import { AppState, type NativeEventSubscription } from 'react-native';
 
 import { type BlindEvent, parseExtrasEmojis } from '@/client/chzzk/protocol';
 import type { ChatMessage } from '@/client/chzzk/types';
 
-import { getDb } from './db';
+import { getDb, getWriteDb } from './db';
 
-// Writes run in an exclusive transaction on its own connection, so a concurrent clearLogs /
-// pruneLogs can't join (and be rolled back with) an open flush transaction. Web's expo-sqlite has
-// no exclusive variant, hence the plain one there (single connection, single flusher).
-function inWriteTransaction(db: SQLiteDatabase, task: (conn: SQLiteDatabase) => Promise<void>): Promise<void> {
-  if (Platform.OS === 'web') return db.withTransactionAsync(() => task(db));
-  return db.withExclusiveTransactionAsync((txn) => task(txn));
+// Writes run on a dedicated write connection (see getWriteDb), one at a time via serialWrite, so
+// a plain transaction there can't be joined by anything else.
+async function inWriteTransaction(task: (conn: SQLiteDatabase) => Promise<void>): Promise<void> {
+  const conn = await getWriteDb();
+  await conn.withTransactionAsync(() => task(conn));
 }
 
 // Every write (flush, clear, prune) runs one at a time through this chain, so two writers never
@@ -70,8 +69,7 @@ export function markLogBlinded(channelId: string, e: BlindEvent): void {
     }
   }
   void serialWrite(async () => {
-    const db = await getDb();
-    await inWriteTransaction(db, async (conn) => {
+    await inWriteTransaction(async (conn) => {
       await conn.runAsync(
         "UPDATE OR IGNORE messages SET message = '', type = 'blinded', extras_json = NULL WHERE channel_id = ? AND msg_time = ? AND user_id_hash = ?",
         channelId,
@@ -94,8 +92,7 @@ async function writeBuffered(): Promise<void> {
   if (buffer.length === 0) return;
   const batch = buffer.splice(0, buffer.length);
   try {
-    const db = await getDb();
-    await inWriteTransaction(db, async (conn) => {
+    await inWriteTransaction(async (conn) => {
       const stmt = await conn.prepareAsync(
         'INSERT OR IGNORE INTO messages (channel_id, chat_channel_id, user_id_hash, nickname, message, type, msg_time, extras_json, created_at) VALUES (?,?,?,?,?,?,?,?,?)',
       );
@@ -217,8 +214,7 @@ export async function countLogs(channelId?: string): Promise<number> {
 
 export function clearLogs(channelId?: string): Promise<void> {
   return serialWrite(async () => {
-    const db = await getDb();
-    await inWriteTransaction(db, async (conn) => {
+    await inWriteTransaction(async (conn) => {
       if (channelId) await conn.runAsync('DELETE FROM messages WHERE channel_id = ?', channelId);
       else await conn.runAsync('DELETE FROM messages');
     });
@@ -228,9 +224,8 @@ export function clearLogs(channelId?: string): Promise<void> {
 export function pruneLogs(days: number): Promise<void> {
   if (!days) return Promise.resolve();
   return serialWrite(async () => {
-    const db = await getDb();
     const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-    await inWriteTransaction(db, async (conn) => {
+    await inWriteTransaction(async (conn) => {
       await conn.runAsync('DELETE FROM messages WHERE msg_time < ?', cutoff);
     });
   });

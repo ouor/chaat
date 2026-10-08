@@ -70,8 +70,11 @@ class ChatKeeperService : Service() {
       manager.notify(NOTIFICATION_ID, build(context))
     }
 
+    @Volatile private var channelReady = false
+
     private fun ensureChannel(context: Context) {
-      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+      if (channelReady || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+      channelReady = true
       val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
       if (manager.getNotificationChannel(CHANNEL_ID) != null) return
       // Default importance so it sits with conversations, but silent: it updates every second.
