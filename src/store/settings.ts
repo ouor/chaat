@@ -12,6 +12,8 @@ export interface Settings {
   fontScale: FontScale;
   retentionDays: RetentionDays;
   chatVariant: ChatVariant;
+  /** Keep the open chat room receiving (and saving) after the app is left, with a notification. */
+  backgroundCollect: boolean;
 }
 
 const DEFAULTS: Settings = {
@@ -19,6 +21,7 @@ const DEFAULTS: Settings = {
   fontScale: 'md',
   retentionDays: 30,
   chatVariant: 'card',
+  backgroundCollect: true,
 };
 const KEY = 'settings';
 // v2: two-line rows became the default. Older saves always wrote chatVariant (every update

@@ -13,6 +13,7 @@ import { Radius, Spacing, TOUCH, Type } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
 import { updateSettings, useSettings, type ChatVariant, type FontScale, type RetentionDays, type ThemeMode } from '@/store/settings';
+import { isChatKeeperAvailable } from '@/store/chat-keeper';
 import { applyRetention, clearSavedChats, countSavedChats } from '@/store/chat-logs';
 
 function Card({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
@@ -116,6 +117,23 @@ export default function SettingsScreen() {
         <Card
           title="채팅 기록"
           description="채팅방을 열어 둔 동안 올라온 채팅이 이 폰에 자동으로 저장돼요. 채팅방 오른쪽 위 '지난 채팅'을 누르면 다시 볼 수 있어요.">
+          {isChatKeeperAvailable ? (
+            <Field label="앱을 내려 둔 동안">
+              <Segmented<'on' | 'off'>
+                options={[
+                  { label: '계속 받기', value: 'on' },
+                  { label: '멈추기', value: 'off' },
+                ]}
+                value={settings.backgroundCollect ? 'on' : 'off'}
+                onSelect={(v) => updateSettings({ backgroundCollect: v === 'on' })}
+              />
+              <Text style={[Type.micro, { color: theme.mute }]}>
+                {settings.backgroundCollect
+                  ? '홈으로 나가거나 화면을 꺼도 채팅을 계속 받아 저장하고, 새 채팅을 알림으로 보여 줘요. 배터리를 조금 더 써요.'
+                  : '앱을 내려 두면 채팅을 받지 않아요. 채팅방을 다시 열면 그때부터 저장돼요.'}
+              </Text>
+            </Field>
+          ) : null}
           <Field label="보관 기간">
             <Segmented<RetentionDays>
               options={[

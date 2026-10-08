@@ -31,3 +31,11 @@ export function splitEmoji(
   if (last < text.length) out.push({ key: `t${i++}`, text: text.slice(last) });
   return out;
 }
+
+/** Text with emoji tokens dropped, for places that can't draw images (notifications). */
+export function stripEmoji(text: string): { text: string; hadEmoji: boolean } {
+  EMOJI_RE.lastIndex = 0;
+  const hadEmoji = EMOJI_RE.test(text);
+  EMOJI_RE.lastIndex = 0;
+  return { text: text.replace(EMOJI_RE, '').replace(/\s+/g, ' ').trim(), hadEmoji };
+}

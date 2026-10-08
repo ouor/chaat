@@ -4,7 +4,9 @@ import { AppState } from 'react-native';
 import { getAccessToken, getLiveStatus } from '@/client/chzzk/rest';
 import { ChatSocket, type ConnState } from '@/client/chzzk/socket';
 import type { ChatMessage } from '@/client/chzzk/types';
+import { startKeeper, type ChatKeeper } from '@/store/chat-keeper';
 import { useEmojiMap } from '@/store/emoji-map';
+import { useSettings } from '@/store/settings';
 import { enqueueLog, markLogBlinded } from '@/storage/log-repo';
 
 const MAX_MESSAGES = 500;
@@ -46,6 +48,8 @@ export interface ChatSession {
 export function useChatSession(
   channelId: string,
   auth: { cookie?: string; uid?: string } = {},
+  /** Channel name, for the background notification. */
+  title = '',
 ): ChatSession {
   const [connState, setConnState] = useState<SessionConnState>('idle');
   const [liveStatus, setLiveStatus] = useState<'OPEN' | 'CLOSE' | null>(null);
@@ -61,6 +65,12 @@ export function useChatSession(
   // Which channel the current messages belong to. Reconnecting the same channel (sign-in resolving
   // after the room opened, retry) keeps what is on screen; the recent-chat replay is deduped.
   const shownChannelRef = useRef<string | null>(null);
+  const { backgroundCollect } = useSettings();
+  // Background collection: while it runs, the socket keeps reconnecting even when the app is
+  // not in front. Stopped from the notification = off until the room is opened again.
+  const keeperRef = useRef<ChatKeeper | null>(null);
+  const keeperStoppedRef = useRef(false);
+  const titleRef = useRef(title);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,6 +123,7 @@ export function useChatSession(
               setCanModerate(true);
             }
             enqueueLog(channelId, m);
+            keeperRef.current?.push(m);
             pending.push(m);
             commitTimer ??= setTimeout(commit, COMMIT_MS);
           },
@@ -127,7 +138,7 @@ export function useChatSession(
         });
         socketRef.current = socket;
         socket.connect();
-        if (AppState.currentState !== 'active') socket.setForeground(false);
+        if (AppState.currentState !== 'active' && !keeperRef.current) socket.setForeground(false);
       } catch {
         if (!cancelled) setConnState('offline');
       }
@@ -141,9 +152,42 @@ export function useChatSession(
     };
   }, [channelId, auth.cookie, auth.uid, attempt]);
 
-  // Doze and network switches leave half-open sockets; let the socket re-check on return to foreground.
   useEffect(() => {
-    const sub = AppState.addEventListener('change', (s) => socketRef.current?.setForeground(s === 'active'));
+    titleRef.current = title;
+    keeperRef.current?.setTitle(title);
+  }, [title]);
+
+  // Runs while this room is open and has a chat room. The service must start while the app is in
+  // front (Android rule), so a room opened in the background starts it on the next return.
+  useEffect(() => {
+    keeperStoppedRef.current = false;
+    if (!chatChannelId || !backgroundCollect) return;
+    const start = () => {
+      if (keeperRef.current || keeperStoppedRef.current) return;
+      keeperRef.current = startKeeper(titleRef.current, () => {
+        keeperRef.current = null;
+        keeperStoppedRef.current = true;
+        socketRef.current?.setForeground(AppState.currentState === 'active');
+      });
+    };
+    if (AppState.currentState === 'active') start();
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') start();
+    });
+    return () => {
+      sub.remove();
+      keeperRef.current?.stop();
+      keeperRef.current = null;
+      socketRef.current?.setForeground(AppState.currentState === 'active');
+    };
+  }, [channelId, chatChannelId, backgroundCollect]);
+
+  // Doze and network switches leave half-open sockets; let the socket re-check on return to
+  // foreground. While collecting in the background the socket behaves as if in front.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) =>
+      socketRef.current?.setForeground(s === 'active' || keeperRef.current != null),
+    );
     return () => sub.remove();
   }, []);
 

@@ -61,7 +61,11 @@ export default function ChatScreen() {
   const favorites = useFavorites();
   // Dev-only preview room (web/DOM checks); release builds treat 'mock' as an invalid channel.
   const isMock = __DEV__ && channelId === 'mock';
-  const real = useChatSession(channelId, { cookie, uid });
+  const fav = favorites.find((f) => f.channelId === channelId);
+  // Favorites already know the name/image, so the header is right before getChannel returns.
+  const detail = useChannelDetail(channelId, !isMock);
+  const name = detail?.channelName ?? fav?.channelName ?? (isMock ? '미리보기 채널' : '');
+  const real = useChatSession(channelId, { cookie, uid }, name);
   const mock = useMockChatSession(isMock, ended === '1');
   const { connState, liveStatus, messages, notice, chatChannelId, streamingChannelId, canModerate, emojiMap, sendChat, retry, setReading } =
     isMock ? mock : real;
@@ -91,10 +95,6 @@ export default function ChatScreen() {
   const [noticeDraft, setNoticeDraft] = useState('');
   const [readOnlyHidden, setReadOnlyHidden] = useState(false);
 
-  const fav = favorites.find((f) => f.channelId === channelId);
-  // Favorites already know the name/image, so the header is right before getChannel returns.
-  const detail = useChannelDetail(channelId, !isMock);
-  const name = detail?.channelName ?? fav?.channelName ?? (isMock ? '미리보기 채널' : '');
   const image = detail?.channelImageUrl || fav?.channelImageUrl || null;
   const profileCard = useProfileCard(chatChannelId, selected?.userIdHash ?? null, cookie);
 

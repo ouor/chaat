@@ -1,0 +1,19 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+  <application>
+    <!-- stopWithTask: swiping the app away from recents ends collection with it. -->
+    <service
+      android:name="expo.modules.chatkeeper.ChatKeeperService"
+      android:exported="false"
+      android:foregroundServiceType="specialUse"
+      android:stopWithTask="true">
+      <property
+        android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+        android:value="Keeps the open live-chat room connected so its chat keeps being received and saved on the device while the app is in the background." />
+    </service>
+  </application>
+</manifest>
