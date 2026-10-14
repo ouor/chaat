@@ -19,6 +19,8 @@ export interface LiveStatus {
   concurrentUserCount: number;
   /** null for channels without a chat room (never streamed, age-restricted, ...). */
   chatChannelId: string | null;
+  /** Age-restricted stream: its chat room is only given to a signed-in, age-verified viewer. */
+  adult: boolean;
 }
 
 export interface AccessToken {

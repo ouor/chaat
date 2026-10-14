@@ -29,6 +29,7 @@ export interface MockChatSession {
   notice: string | null;
   streamingChannelId: string | null;
   canModerate: boolean;
+  adultOnly: boolean;
   emojiMap: Record<string, string>;
   sendChat: (text: string) => boolean;
   retry: () => void;
@@ -71,6 +72,7 @@ export function useMockChatSession(enabled: boolean, ended = false): MockChatSes
     notice: null,
     streamingChannelId: null,
     canModerate: false,
+    adultOnly: false,
     emojiMap: {},
     sendChat: () => true,
     retry: () => undefined,

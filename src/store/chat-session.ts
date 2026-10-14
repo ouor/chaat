@@ -37,6 +37,8 @@ export interface ChatSession {
   notice: string | null;
   streamingChannelId: string | null;
   canModerate: boolean;
+  /** 'unavailable' because the stream is age-restricted (sign in / age verification needed). */
+  adultOnly: boolean;
   emojiMap: Record<string, string>;
   /** False when not connected; the caller should keep the draft. */
   sendChat: (text: string) => boolean;
@@ -57,6 +59,7 @@ export function useChatSession(
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [canModerate, setCanModerate] = useState(false);
+  const [adultOnly, setAdultOnly] = useState(false);
   const emojiMap = useEmojiMap(channelId, auth.cookie);
   const [attempt, setAttempt] = useState(0);
   const socketRef = useRef<ChatSocket | null>(null);
@@ -107,11 +110,12 @@ export function useChatSession(
       }
       setConnState('connecting');
       try {
-        const status = await getLiveStatus(channelId);
+        const status = await getLiveStatus(channelId, auth.cookie);
         if (cancelled) return;
         setLiveStatus(status.status);
         const cid = status.chatChannelId;
         setChatChannelId(cid);
+        setAdultOnly(!cid && status.adult);
         if (!cid) {
           setConnState('unavailable');
           return;
@@ -236,6 +240,7 @@ export function useChatSession(
     // goes into authenticated blind/notice requests.
     streamingChannelId: chatChannelId ? channelId : null,
     canModerate,
+    adultOnly,
     emojiMap,
     sendChat,
     retry,

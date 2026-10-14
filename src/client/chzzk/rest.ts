@@ -141,11 +141,15 @@ export function searchChannels(
   });
 }
 
-export async function getLiveStatus(channelId: string): Promise<LiveStatus> {
-  return get(SERVICE_BASE, `/polling/v2/channels/${channelPath(channelId)}/live-status`, {}).then((c) => {
+/**
+ * The answer depends on the viewer (it carries userAdultStatus): pass the session cookie, or an
+ * age-restricted stream comes back without its chatChannelId.
+ */
+export async function getLiveStatus(channelId: string, cookie?: string): Promise<LiveStatus> {
+  return get(SERVICE_BASE, `/polling/v2/channels/${channelPath(channelId)}/live-status`, {}, cookie).then((c) => {
     // A channel that has never streamed answers code 200 with content: null (verified against
     // a raw response): no live, no chat room — not an error.
-    if (c === null) return { channelId, status: 'CLOSE', concurrentUserCount: 0, chatChannelId: null };
+    if (c === null) return { channelId, status: 'CLOSE', concurrentUserCount: 0, chatChannelId: null, adult: false };
     if (!isRecord(c)) unexpected('live-status');
     return {
       channelId,
@@ -153,6 +157,7 @@ export async function getLiveStatus(channelId: string): Promise<LiveStatus> {
       concurrentUserCount: num(c.concurrentUserCount),
       // Validated here so nothing downstream opens a socket for a null/empty chat room id.
       chatChannelId: typeof c.chatChannelId === 'string' && c.chatChannelId.length > 0 ? c.chatChannelId : null,
+      adult: c.adult === true,
     };
   });
 }

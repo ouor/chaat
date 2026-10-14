@@ -67,7 +67,7 @@ export default function ChatScreen() {
   const name = detail?.channelName ?? fav?.channelName ?? (isMock ? '미리보기 채널' : '');
   const real = useChatSession(channelId, { cookie, uid }, name);
   const mock = useMockChatSession(isMock, ended === '1');
-  const { connState, liveStatus, messages, notice, chatChannelId, streamingChannelId, canModerate, emojiMap, sendChat, retry, setReading } =
+  const { connState, liveStatus, messages, notice, chatChannelId, streamingChannelId, canModerate, adultOnly, emojiMap, sendChat, retry, setReading } =
     isMock ? mock : real;
 
   const [draft, setDraft] = useState('');
@@ -325,7 +325,20 @@ export default function ChatScreen() {
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              {connState === 'unavailable' ? (
+              {connState === 'unavailable' && adultOnly ? (
+                <>
+                  <View style={[styles.emptyIcon, { backgroundColor: theme.canvasSoft }]}>
+                    <Icon name="lock" color={theme.mute} size={24} />
+                  </View>
+                  <Text style={[Type.bodyStrong, { color: theme.ink }]}>연령 제한 방송이에요</Text>
+                  <Text style={[Type.label, styles.emptyHint, { color: theme.mute }]}>
+                    {loggedIn
+                      ? '성인 인증을 마친 네이버 계정이어야 채팅을 볼 수 있어요.'
+                      : '네이버로 로그인하면 채팅을 볼 수 있어요. 성인 인증을 마친 계정이어야 해요.'}
+                  </Text>
+                  {loggedIn ? null : <Button label="로그인" onPress={() => router.push('/login')} />}
+                </>
+              ) : connState === 'unavailable' ? (
                 <>
                   <View style={[styles.emptyIcon, { backgroundColor: theme.canvasSoft }]}>
                     <Icon name="chat" color={theme.mute} size={24} />
