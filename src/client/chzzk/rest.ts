@@ -143,6 +143,9 @@ export function searchChannels(
 
 export async function getLiveStatus(channelId: string): Promise<LiveStatus> {
   return get(SERVICE_BASE, `/polling/v2/channels/${channelPath(channelId)}/live-status`, {}).then((c) => {
+    // A channel that has never streamed answers code 200 with content: null (verified against
+    // a raw response): no live, no chat room — not an error.
+    if (c === null) return { channelId, status: 'CLOSE', concurrentUserCount: 0, chatChannelId: null };
     if (!isRecord(c)) unexpected('live-status');
     return {
       channelId,
