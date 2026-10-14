@@ -77,12 +77,10 @@ export function ProfileThumb({ uri, name, size }: { uri?: string; name: string; 
 
 export const ChatRow = memo(function ChatRow({
   m,
-  showTime,
   onPress,
   emojiMap,
 }: {
   m: ChatMessage;
-  showTime: boolean;
   // Takes the message so the list can pass one stable callback and keep memo intact.
   onPress?: (m: ChatMessage) => void;
   emojiMap?: Record<string, string>;
@@ -153,7 +151,7 @@ export const ChatRow = memo(function ChatRow({
             <Text style={[styles.nick, styles.cardNick, nickStyle]} numberOfLines={1}>
               {m.nickname}
             </Text>
-            {showTime ? <Text style={[Type.micro, { color: theme.mute }]}>{fmtTime(m.msgTime)}</Text> : null}
+            <Text style={[Type.micro, { color: theme.mute }]}>{fmtTime(m.msgTime)}</Text>
           </View>
           {body}
         </View>
@@ -161,13 +159,11 @@ export const ChatRow = memo(function ChatRow({
     );
   }
 
-  // One-line layout is the dense, text-only mode: no avatars, and the time (ended streams only)
-  // leads the row as a quiet fixed column instead of a ragged right edge.
+  // One-line layout is the dense, text-only mode: no avatars, and the time leads the row as a
+  // quiet fixed column instead of a ragged right edge. Shown live and ended alike.
   return (
     <Pressable {...pressableProps} style={styles.chatRow}>
-      {showTime ? (
-        <Text style={[Type.micro, styles.time, { color: theme.mute, lineHeight: font + 6 }]}>{fmtTime(m.msgTime)}</Text>
-      ) : null}
+      <Text style={[Type.micro, styles.time, { color: theme.mute, lineHeight: font + 6 }]}>{fmtTime(m.msgTime)}</Text>
       {m.role !== 'member' ? (
         <View style={[styles.thumbSlot, { height: font + 6 }]}>
           <RoleBadge role={m.role} />

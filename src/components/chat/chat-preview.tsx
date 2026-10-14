@@ -10,7 +10,7 @@ const sample = (p: Partial<ChatMessage> & Pick<ChatMessage, 'nickname' | 'messag
   userIdHash: p.nickname,
   msgType: 'text',
   role: 'member',
-  msgTime: 0,
+  msgTime: new Date(2026, 0, 1, 21, 4).getTime(),
   extras: {},
   ...p,
 });
@@ -28,7 +28,7 @@ export function ChatPreview({ label, surface = 'canvas' }: { label: string; surf
     <View style={[styles.box, { backgroundColor: theme[surface] }]} accessibilityLabel={`${label}: 채팅 예시`}>
       <Text style={[Type.micro, styles.label, { color: theme.mute }]}>{label}</Text>
       {SAMPLES.map((m) => (
-        <ChatRow key={m.nickname} m={m} showTime={false} />
+        <ChatRow key={m.nickname} m={m} />
       ))}
     </View>
   );

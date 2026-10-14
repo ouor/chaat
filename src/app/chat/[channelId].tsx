@@ -151,12 +151,11 @@ export default function ChatScreen() {
     ({ item }: { item: ChatMessage }) => (
       <ChatRow
         m={item}
-        showTime={isEnded}
         emojiMap={emojiMap}
         onPress={setSelected}
       />
     ),
-    [isEnded, emojiMap],
+    [emojiMap],
   );
 
   function closeProfile() {
