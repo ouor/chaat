@@ -124,6 +124,11 @@ export default function HomeScreen() {
           <FlashList
             data={sorted}
             extraData={liveMap}
+            // FlashList 2 keeps the visible item anchored by default. When live statuses arrive and
+            // a live channel moves to the top, that anchored the old first row and pushed the new
+            // first one above the screen (opened scrolled to the second channel). A favorites list
+            // re-sorted from the top should just stay at the top.
+            maintainVisibleContentPosition={{ disabled: true }}
             onRefresh={() => {
               setRefreshing(true);
               loadStatuses();
