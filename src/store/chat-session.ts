@@ -17,6 +17,9 @@ const MAX_WHILE_READING = 2000;
 const COMMIT_MS = 100;
 // Reconnect re-requests the last 50 recent chats; they can only overlap the tail of the list.
 const DEDUP_WINDOW = 100;
+// Viewer count / live state refresh while the room is on screen (the server's own polling hint
+// is 10s; nothing reads it in the background, where JS timers stop anyway).
+const STATUS_POLL_MS = 15000;
 
 function isDuplicate(prev: ChatMessage[], m: ChatMessage): boolean {
   for (let i = prev.length - 1; i >= Math.max(0, prev.length - DEDUP_WINDOW); i--) {
@@ -39,6 +42,8 @@ export interface ChatSession {
   canModerate: boolean;
   /** 'unavailable' because the stream is age-restricted (sign in / age verification needed). */
   adultOnly: boolean;
+  /** Current viewers while live (refreshed every 15s on screen); null when not live / unknown. */
+  viewers: number | null;
   emojiMap: Record<string, string>;
   /** False when not connected; the caller should keep the draft. */
   sendChat: (text: string) => boolean;
@@ -60,6 +65,7 @@ export function useChatSession(
   const [notice, setNotice] = useState<string | null>(null);
   const [canModerate, setCanModerate] = useState(false);
   const [adultOnly, setAdultOnly] = useState(false);
+  const [viewers, setViewers] = useState<number | null>(null);
   const emojiMap = useEmojiMap(channelId, auth.cookie);
   const [attempt, setAttempt] = useState(0);
   const socketRef = useRef<ChatSocket | null>(null);
@@ -113,6 +119,7 @@ export function useChatSession(
         const status = await getLiveStatus(channelId, auth.cookie);
         if (cancelled) return;
         setLiveStatus(status.status);
+        setViewers(status.status === 'OPEN' ? status.concurrentUserCount : null);
         const cid = status.chatChannelId;
         setChatChannelId(cid);
         setAdultOnly(!cid && status.adult);
@@ -173,6 +180,26 @@ export function useChatSession(
       pumpRef.current = null;
     };
   }, [channelId, auth.cookie, auth.uid, attempt]);
+
+  // Keeps the viewer count (and LIVE -> ended) current while the room is open and on screen.
+  useEffect(() => {
+    if (!chatChannelId) return;
+    let cancelled = false;
+    const t = setInterval(() => {
+      if (AppState.currentState !== 'active') return;
+      getLiveStatus(channelId, auth.cookie)
+        .then((s) => {
+          if (cancelled) return;
+          setLiveStatus(s.status);
+          setViewers(s.status === 'OPEN' ? s.concurrentUserCount : null);
+        })
+        .catch(() => undefined);
+    }, STATUS_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [channelId, chatChannelId, auth.cookie]);
 
   useEffect(() => {
     titleRef.current = title;
@@ -241,6 +268,7 @@ export function useChatSession(
     streamingChannelId: chatChannelId ? channelId : null,
     canModerate,
     adultOnly,
+    viewers,
     emojiMap,
     sendChat,
     retry,

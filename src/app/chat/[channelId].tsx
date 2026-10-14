@@ -67,7 +67,7 @@ export default function ChatScreen() {
   const name = detail?.channelName ?? fav?.channelName ?? (isMock ? '미리보기 채널' : '');
   const real = useChatSession(channelId, { cookie, uid }, name);
   const mock = useMockChatSession(isMock, ended === '1');
-  const { connState, liveStatus, messages, notice, chatChannelId, streamingChannelId, canModerate, adultOnly, emojiMap, sendChat, retry, setReading } =
+  const { connState, liveStatus, messages, notice, chatChannelId, streamingChannelId, canModerate, adultOnly, viewers, emojiMap, sendChat, retry, setReading } =
     isMock ? mock : real;
 
   const [draft, setDraft] = useState('');
@@ -142,7 +142,7 @@ export default function ChatScreen() {
     connState !== 'connected'
       ? { label: conn.label, dot: conn.color }
       : isLive
-        ? { label: '실시간', dot: 'primarySoft' }
+        ? { label: viewers != null ? `실시간 · ${viewers.toLocaleString()}명 시청 중` : '실시간', dot: 'primarySoft' }
         : isEnded
           ? { label: '방송 종료', dot: null }
           : { label: conn.label, dot: conn.color };
