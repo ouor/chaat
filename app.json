@@ -2,14 +2,14 @@
   "expo": {
     "name": "chaat",
     "slug": "chaat",
-    "version": "0.6.0",
+    "version": "0.6.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "chaat",
     "userInterfaceStyle": "automatic",
     "android": {
       "package": "com.chaat.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "allowBackup": false,
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW",
