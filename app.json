@@ -2,14 +2,14 @@
   "expo": {
     "name": "chaat",
     "slug": "chaat",
-    "version": "0.6.1",
+    "version": "0.6.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "chaat",
     "userInterfaceStyle": "automatic",
     "android": {
       "package": "com.chaat.app",
-      "versionCode": 3,
+      "versionCode": 4,
       "allowBackup": false,
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW",
@@ -39,7 +39,8 @@
         }
       ],
       "expo-sqlite",
-      "./plugins/with-no-data-transfer"
+      "./plugins/with-no-data-transfer",
+      "./plugins/with-release-signing"
     ],
     "experiments": {
       "typedRoutes": true,

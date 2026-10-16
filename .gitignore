@@ -46,3 +46,7 @@ example
 
 # local Expo module build output
 modules/*/android/build/
+
+# release signing secrets (see signing/SIGNING.md)
+signing/release.p12
+signing/keystore.properties
