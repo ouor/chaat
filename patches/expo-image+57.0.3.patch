@@ -1,0 +1,45 @@
+diff --git a/node_modules/expo-image/android/src/main/java/expo/modules/image/ExpoImageAppGlideModule.kt b/node_modules/expo-image/android/src/main/java/expo/modules/image/ExpoImageAppGlideModule.kt
+index 5735515..ad6693c 100644
+--- a/node_modules/expo-image/android/src/main/java/expo/modules/image/ExpoImageAppGlideModule.kt
++++ b/node_modules/expo-image/android/src/main/java/expo/modules/image/ExpoImageAppGlideModule.kt
+@@ -2,9 +2,16 @@ package expo.modules.image
+ 
+ import android.content.Context
+ import android.util.Log
++import com.bumptech.glide.Glide
+ import com.bumptech.glide.GlideBuilder
++import com.bumptech.glide.Registry
+ import com.bumptech.glide.annotation.GlideModule
++import com.bumptech.glide.load.resource.gif.ByteBufferGifDecoder
++import com.bumptech.glide.load.resource.gif.GifDrawable
++import com.bumptech.glide.load.resource.gif.StreamGifDecoder
+ import com.bumptech.glide.module.AppGlideModule
++import java.io.InputStream
++import java.nio.ByteBuffer
+ 
+ /**
+  * We need to include an [AppGlideModule] for [GlideModule] annotations
+@@ -23,4 +30,23 @@ class ExpoImageAppGlideModule : AppGlideModule() {
+       }
+     )
+   }
++
++  // chaat patch: decode GIFs with Glide's own GifDrawable instead of the penfeizhou glide-plugin.
++  // The plugin's FrameAnimationDrawable has no ConstantState, so Glide's memory cache hands the
++  // same Drawable instance (and FrameSeqDecoder) to every view showing that GIF; each view's
++  // start()/stop() then restarts or tears down the shared decoder (re-decoding the GIF and
++  // logging "Processing,wait for finish" ~10x/s in a busy chat). Glide's GifDrawable gives each
++  // view its own drawable over a shared, ref-counted frame loader. The app module is applied
++  // after library modules, so these prepends win over the plugin's; other formats are untouched.
++  override fun registerComponents(context: Context, glide: Glide, registry: Registry) {
++    super.registerComponents(context, glide, registry)
++    val byteBufferGifDecoder =
++      ByteBufferGifDecoder(context, registry.imageHeaderParsers, glide.bitmapPool, glide.arrayPool)
++    registry.prepend(ByteBuffer::class.java, GifDrawable::class.java, byteBufferGifDecoder)
++    registry.prepend(
++      InputStream::class.java,
++      GifDrawable::class.java,
++      StreamGifDecoder(registry.imageHeaderParsers, byteBufferGifDecoder, glide.arrayPool)
++    )
++  }
+ }

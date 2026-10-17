@@ -52,5 +52,14 @@
     "verify:chzzk": "tsx scripts/verify-chzzk.ts",
     "postinstall": "patch-package"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "autolinking": {
+      "android": {
+        "buildFromSource": [
+          "expo-image"
+        ]
+      }
+    }
+  }
 }
