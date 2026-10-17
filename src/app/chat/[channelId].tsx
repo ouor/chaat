@@ -102,11 +102,14 @@ export default function ChatScreen() {
 
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const atBottom = useRef(true);
-  // Only a finger (a drag and the fling after it) may leave or rejoin the newest end. In a busy
-  // room, maintainVisibleContentPosition shifts the offset on every batch and a slow list update
-  // lands those shifts in onScroll late; read as "scrolled up", they flipped the room into
-  // reading mode (and a 2000-row cap that made it slower still) and it never caught up again.
+  // Mirrors atBottom for rendering: maintainVisibleContentPosition is on only while reading.
+  // Following the newest end needs nothing (new rows land at offset 0 of the inverted list); with
+  // it on, a busy room's batches shifted the offset and its animated autoscroll fired momentum
+  // events with no finger on the screen (logged on device), which read as "scrolled up".
+  const [following, setFollowing] = useState(true);
+  // Only a finger may leave or rejoin the newest end: a drag, or a fling right after one.
   const userScrolling = useRef(false);
+  const flingUntil = useRef(0);
   const lastNewest = useRef<string | null>(null);
 
   // Count arrivals by how far the previous newest message moved, not by list length:
@@ -133,6 +136,7 @@ export default function ChatScreen() {
     const bottom = y < 20;
     if (bottom !== atBottom.current) {
       atBottom.current = bottom;
+      setFollowing(bottom);
       setReading(!bottom);
       if (bottom) setUnread(0);
     }
@@ -140,6 +144,7 @@ export default function ChatScreen() {
 
   function jumpBottom() {
     atBottom.current = true;
+    setFollowing(true);
     setReading(false);
     setUnread(0);
     listRef.current?.scrollToOffset({ offset: 0, animated: true });
@@ -323,14 +328,17 @@ export default function ChatScreen() {
           onScrollBeginDrag={() => {
             userScrolling.current = true;
           }}
-          onMomentumScrollBegin={() => {
-            userScrolling.current = true;
-          }}
           onScrollEndDrag={() => {
             userScrolling.current = false;
+            flingUntil.current = Date.now() + 150;
+          }}
+          // A fling starts right as the finger lifts; any other momentum is programmatic.
+          onMomentumScrollBegin={() => {
+            if (Date.now() < flingUntil.current) userScrolling.current = true;
           }}
           onMomentumScrollEnd={() => {
             userScrolling.current = false;
+            flingUntil.current = 0;
           }}
           scrollEventThrottle={16}
           // Bursts of ~30 chats/s: render a smaller window around the viewport so each batch
@@ -338,8 +346,8 @@ export default function ChatScreen() {
           windowSize={7}
           maxToRenderPerBatch={8}
           // Scrolled up: keep the row being read in place as new chats land at index 0.
-          // Near the newest end (offset < 20): keep following new messages.
-          maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 20 }}
+          // Following: off, so new chats simply appear at the bottom (offset 0).
+          maintainVisibleContentPosition={following ? undefined : { minIndexForVisible: 0 }}
           style={styles.list}
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={
