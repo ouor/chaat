@@ -17,8 +17,12 @@ export function safeFileName(name: string): string {
  * is never one string) and returns its file URI.
  */
 export async function writeExportFile(baseName: string, ext: string, chunks: AsyncIterable<string>): Promise<string> {
+  // Not create({ overwrite: true }): on Android it deletes with java.io.File.delete(), which
+  // can't remove a non-empty folder, so every export after the first failed ("directory already
+  // exists"). Directory.delete() removes the folder with the previous export in it.
+  clearExports();
   const dir = new Directory(Paths.cache, EXPORT_DIR);
-  dir.create({ intermediates: true, overwrite: true });
+  dir.create({ intermediates: true });
   const file = new File(dir, `${safeFileName(baseName)}.${ext}`);
   file.create();
   for await (const chunk of chunks) file.write(chunk, { append: true });

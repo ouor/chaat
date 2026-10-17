@@ -115,7 +115,9 @@ export default function LogsScreen() {
     setExportError(false);
     try {
       await exportChatLogs(channelId, title, debouncedQuery);
-    } catch {
+    } catch (e) {
+      // The reason only (no chat content): without it an export failure leaves nothing to go on.
+      console.warn('[export] failed:', e instanceof Error ? `${e.name}: ${e.message}\n${e.stack ?? ''}` : String(e));
       setExportError(true);
     } finally {
       setExporting(false);
