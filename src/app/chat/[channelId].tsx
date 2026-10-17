@@ -102,6 +102,11 @@ export default function ChatScreen() {
 
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const atBottom = useRef(true);
+  // Only a finger (a drag and the fling after it) may leave or rejoin the newest end. In a busy
+  // room, maintainVisibleContentPosition shifts the offset on every batch and a slow list update
+  // lands those shifts in onScroll late; read as "scrolled up", they flipped the room into
+  // reading mode (and a 2000-row cap that made it slower still) and it never caught up again.
+  const userScrolling = useRef(false);
   const lastNewest = useRef<string | null>(null);
 
   // Count arrivals by how far the previous newest message moved, not by list length:
@@ -119,7 +124,13 @@ export default function ChatScreen() {
   function onScroll(e: {
     nativeEvent: { contentOffset: { y: number } };
   }) {
-    const bottom = e.nativeEvent.contentOffset.y < 20;
+    const y = e.nativeEvent.contentOffset.y;
+    if (!userScrolling.current) {
+      // Following the newest chat but the content drifted under a burst: pin it back.
+      if (atBottom.current && y > 1) listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      return;
+    }
+    const bottom = y < 20;
     if (bottom !== atBottom.current) {
       atBottom.current = bottom;
       setReading(!bottom);
@@ -309,7 +320,23 @@ export default function ChatScreen() {
           onViewableItemsChanged={onViewableItemsChanged}
           renderItem={renderItem}
           onScroll={onScroll}
+          onScrollBeginDrag={() => {
+            userScrolling.current = true;
+          }}
+          onMomentumScrollBegin={() => {
+            userScrolling.current = true;
+          }}
+          onScrollEndDrag={() => {
+            userScrolling.current = false;
+          }}
+          onMomentumScrollEnd={() => {
+            userScrolling.current = false;
+          }}
           scrollEventThrottle={16}
+          // Bursts of ~30 chats/s: render a smaller window around the viewport so each batch
+          // updates fewer cells (default windowSize 21 = ten screens each way).
+          windowSize={7}
+          maxToRenderPerBatch={8}
           // Scrolled up: keep the row being read in place as new chats land at index 0.
           // Near the newest end (offset < 20): keep following new messages.
           maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 20 }}
