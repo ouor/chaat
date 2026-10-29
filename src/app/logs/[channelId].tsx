@@ -6,13 +6,14 @@ import { EmojiText } from '@/components/chat/emoji-text';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { ScreenHeader } from '@/components/ui/screen-header';
-import { ANONYMOUS_DONOR, BLINDED_TEXT } from '@/constants/chat-text';
+import { BLINDED_TEXT, displayNickname } from '@/constants/chat-text';
 import { Radius, Spacing, TOUCH, Type } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
+import { hhmm } from '@/lib/time';
 import { useAuth } from '@/store/auth-context';
 import { useEmojiMap } from '@/store/emoji-map';
 import { useFavorites } from '@/store/favorites';
-import { exportChatLogs, loadChatLogs, LOG_LIMIT, type LogRow } from '@/store/chat-logs';
+import { exportChatLogs, getLogs, LOG_LIMIT, type LogRow } from '@/store/chat-logs';
 
 type Entry =
   | { kind: 'header'; label: string }
@@ -43,11 +44,6 @@ function rangeLabel(rowsOldestFirst: LogRow[]): string {
   const first = shortDate(rowsOldestFirst[0].msg_time);
   const last = shortDate(rowsOldestFirst[rowsOldestFirst.length - 1].msg_time);
   return `저장된 채팅 · ${first === last ? first : `${first} ~ ${last}`}`;
-}
-
-function fmtTime(ms: number): string {
-  const d = new Date(ms);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 /** Newest-first entries for an inverted list: each day's header follows its oldest row. */
@@ -93,7 +89,7 @@ export default function LogsScreen() {
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      loadChatLogs(channelId, debouncedQuery)
+      getLogs(channelId, debouncedQuery)
         .then((r) => {
           if (cancelled) return;
           setRows(r);
@@ -217,7 +213,7 @@ export default function LogsScreen() {
               </View>
             ) : (
               <View style={styles.row}>
-                <Text style={[Type.micro, styles.rowTime, { color: theme.mute }]}>{fmtTime(item.row.msg_time)}</Text>
+                <Text style={[Type.micro, styles.rowTime, { color: theme.mute }]}>{hhmm(item.row.msg_time)}</Text>
                 <View style={styles.rowBody}>
                   <View style={styles.rowNickLine}>
                     {item.row.type === 'donation' ? (
@@ -226,7 +222,7 @@ export default function LogsScreen() {
                       </View>
                     ) : null}
                     <Text style={[Type.caption, styles.rowNick, { color: theme.body }]} numberOfLines={1}>
-                      {item.row.nickname || (item.row.type === 'donation' ? ANONYMOUS_DONOR : '익명')}
+                      {displayNickname(item.row.nickname, item.row.type)}
                     </Text>
                   </View>
                   {item.row.type === 'blinded' ? (

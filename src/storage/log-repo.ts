@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { AppState, type NativeEventSubscription } from 'react-native';
 
-import { type BlindEvent, parseExtrasEmojis } from '@/client/chzzk/protocol';
+import { type BlindEvent, isBlindTarget, parseExtrasEmojis } from '@/client/chzzk/protocol';
 import type { ChatMessage } from '@/client/chzzk/types';
 
 import { getDb, getWriteDb } from './db';
@@ -65,7 +65,7 @@ export function enqueueLog(channelId: string, m: ChatMessage): void {
  */
 export function markLogBlinded(channelId: string, e: BlindEvent): void {
   for (const b of buffer) {
-    if (b.channelId === channelId && b.m.msgTime === e.messageTime && b.m.userIdHash === e.userIdHash) {
+    if (b.channelId === channelId && isBlindTarget(b.m, e)) {
       b.m = { ...b.m, blinded: true };
     }
   }

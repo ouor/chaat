@@ -2,20 +2,13 @@
 // storage layer (AGENTS.md rule 2), so archive policy (retention, what a "saved chat" row is)
 // has one home.
 import { clearExports, shareFile, writeExportFile } from '@/storage/export-file';
-import { clearLogs, countLogs, eachLog, getLogs, LOG_LIMIT, pruneLogs, type LogRow } from '@/storage/log-repo';
+import { clearLogs, eachLog } from '@/storage/log-repo';
 
-import { CSV_BOM, csvHeader, csvLine } from './chat-csv';
+import { CSV_BOM, csvHeader, csvLine } from '@/lib/chat-csv';
+import { pad2 } from '@/lib/time';
 
-export { LOG_LIMIT, type LogRow };
-
-/** Newest saved rows for a channel (oldest first), optionally filtered by text or nickname. */
-export function loadChatLogs(channelId: string, query = ''): Promise<LogRow[]> {
-  return getLogs(channelId, query);
-}
-
-export function countSavedChats(): Promise<number> {
-  return countLogs();
-}
+// Plain reads/retention need no store-side policy; screens use them under their storage names.
+export { countLogs, getLogs, LOG_LIMIT, pruneLogs, type LogRow } from '@/storage/log-repo';
 
 /** Every saved chat, plus the last exported CSV still in the app cache. */
 export async function clearSavedChats(): Promise<void> {
@@ -27,14 +20,7 @@ export async function clearSavedChats(): Promise<void> {
   }
 }
 
-/** Drops rows older than the retention window (0 = keep forever). */
-export function applyRetention(days: number): Promise<void> {
-  return pruneLogs(days);
-}
-
 const CHUNK_ROWS = 500;
-
-const pad = (n: number) => String(n).padStart(2, '0');
 
 /**
  * Writes every saved chat matching `query` (the whole archive, not just the LOG_LIMIT shown) to
@@ -59,7 +45,7 @@ export async function exportChatLogs(channelId: string, channelName: string, que
   }
 
   const d = new Date();
-  const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+  const stamp = `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}`;
   const q = query.trim();
   const name = `${channelName} 채팅 ${stamp}${q ? ` (${q})` : ''}`;
   const uri = await writeExportFile(name, 'csv', chunks());

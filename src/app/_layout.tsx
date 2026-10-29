@@ -3,14 +3,14 @@ import { useEffect } from 'react';
 
 import { AuthProvider } from '@/store/auth-context';
 import { getSettings, useSettings } from '@/store/settings';
-import { applyRetention } from '@/store/chat-logs';
+import { pruneLogs } from '@/store/chat-logs';
 
 export default function RootLayout() {
   const { theme } = useSettings();
 
   useEffect(() => {
     const { retentionDays } = getSettings();
-    void applyRetention(retentionDays);
+    void pruneLogs(retentionDays);
   }, []);
 
   return (

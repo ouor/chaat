@@ -8,7 +8,7 @@ const EXPORT_DIR = 'exports';
 /** Characters Android/Windows file names can't hold. */
 const UNSAFE_NAME = /[\\/:*?"<>|\u0000-\u001f]+/g;
 
-export function safeFileName(name: string): string {
+function safeFileName(name: string): string {
   return name.replace(UNSAFE_NAME, '_').trim().slice(0, 80) || 'chaat';
 }
 

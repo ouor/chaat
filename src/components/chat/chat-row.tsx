@@ -6,6 +6,7 @@ import type { ChatMessage } from '@/client/chzzk/types';
 import { ANONYMOUS_DONOR, BLINDED_TEXT } from '@/constants/chat-text';
 import { Radius, Spacing, Type } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
+import { hhmm } from '@/lib/time';
 import { useProfileImage } from '@/store/profile-images';
 import { useSettings, type FontScale } from '@/store/settings';
 import { EmojiText } from '@/components/chat/emoji-text';
@@ -19,13 +20,6 @@ function nickKey(hash: string): (typeof NICKS)[number] {
   let n = 0;
   for (const ch of hash) n = (n * 31 + ch.charCodeAt(0)) | 0;
   return NICKS[Math.abs(n) % NICKS.length];
-}
-
-function fmtTime(t: number): string {
-  const d = new Date(t);
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  return `${hh}:${mm}`;
 }
 
 function RoleBadge({ role }: { role: ChatMessage['role'] }) {
@@ -151,7 +145,7 @@ export const ChatRow = memo(function ChatRow({
             <Text style={[styles.nick, styles.cardNick, nickStyle]} numberOfLines={1}>
               {m.nickname}
             </Text>
-            <Text style={[Type.micro, { color: theme.mute }]}>{fmtTime(m.msgTime)}</Text>
+            <Text style={[Type.micro, { color: theme.mute }]}>{hhmm(m.msgTime)}</Text>
           </View>
           {body}
         </View>
@@ -163,7 +157,7 @@ export const ChatRow = memo(function ChatRow({
   // quiet fixed column instead of a ragged right edge. Shown live and ended alike.
   return (
     <Pressable {...pressableProps} style={styles.chatRow}>
-      <Text style={[Type.micro, styles.time, { color: theme.mute, lineHeight: font + 6 }]}>{fmtTime(m.msgTime)}</Text>
+      <Text style={[Type.micro, styles.time, { color: theme.mute, lineHeight: font + 6 }]}>{hhmm(m.msgTime)}</Text>
       {m.role !== 'member' ? (
         <View style={[styles.thumbSlot, { height: font + 6 }]}>
           <RoleBadge role={m.role} />

@@ -11,7 +11,7 @@ import { Radius, Spacing, Type } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
 import type { NaverCookies } from '@/store/auth-context';
-import { isNaverUrl, urlHost } from '@/store/naver-url';
+import { isNaverUrl, urlHost } from '@/lib/naver-url';
 
 // Reassurance for people wary of signing in through an app they don't know yet.
 const POINTS: { icon: IconName; title: string; body: string }[] = [

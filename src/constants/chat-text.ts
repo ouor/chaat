@@ -2,3 +2,8 @@
 /** The official app's wording for donations sent without a nickname. */
 export const ANONYMOUS_DONOR = '익명의 후원자';
 export const BLINDED_TEXT = '가려진 메시지예요';
+
+/** The name shown for a chat; donations and chats can arrive without one. */
+export function displayNickname(nickname: string, type: string): string {
+  return nickname || (type === 'donation' ? ANONYMOUS_DONOR : '익명');
+}

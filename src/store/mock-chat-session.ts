@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import type { ChatMessage } from '@/client/chzzk/types';
+import type { ChatSession } from '@/store/chat-session';
 import { enqueueLog } from '@/storage/log-repo';
 
 // Mock live chat for web/DOM analysis: keeps appending new messages so the rendered
@@ -21,24 +22,8 @@ const TEXTS = [
   '방송 끝나고도 채팅 계속 볼 수 있는 거 진짜 편하네요 오늘도 수고 많으셨어요',
 ];
 
-export interface MockChatSession {
-  connState: 'connected';
-  liveStatus: 'OPEN' | 'CLOSE';
-  chatChannelId: string | null;
-  messages: ChatMessage[];
-  notice: string | null;
-  streamingChannelId: string | null;
-  canModerate: boolean;
-  adultOnly: boolean;
-  viewers: number | null;
-  emojiMap: Record<string, string>;
-  sendChat: (text: string) => boolean;
-  retry: () => void;
-  setReading: (reading: boolean) => void;
-}
-
 /** `ended` renders the after-stream state (`/chat/mock?ended=1`). */
-export function useMockChatSession(enabled: boolean, ended = false): MockChatSession {
+export function useMockChatSession(enabled: boolean, ended = false): ChatSession {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   useEffect(() => {
@@ -60,6 +45,7 @@ export function useMockChatSession(enabled: boolean, ended = false): MockChatSes
       };
       i += 1;
       setMessages((prev) => (prev.length >= 300 ? [...prev.slice(-299), m] : [...prev, m]));
+      // Archived under channel 'mock' too, so the log viewer and export can be exercised offline.
       enqueueLog('mock', m);
     }, 700);
     return () => clearInterval(t);

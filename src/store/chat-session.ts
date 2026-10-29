@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
+import { chatKey, isBlindTarget } from '@/client/chzzk/protocol';
 import { getAccessToken, getLiveStatus, isChannelId } from '@/client/chzzk/rest';
 import { ChatSocket, type ConnState } from '@/client/chzzk/socket';
 import type { ChatMessage } from '@/client/chzzk/types';
@@ -24,7 +25,7 @@ const STATUS_POLL_MS = 15000;
 function isDuplicate(prev: ChatMessage[], m: ChatMessage): boolean {
   for (let i = prev.length - 1; i >= Math.max(0, prev.length - DEDUP_WINDOW); i--) {
     const p = prev[i];
-    if (p.msgTime === m.msgTime && p.userIdHash === m.userIdHash && p.message === m.message) return true;
+    if (chatKey(p) === chatKey(m)) return true;
   }
   return false;
 }
@@ -143,7 +144,7 @@ export function useChatSession(
             commitTimer ??= setTimeout(commit, COMMIT_MS);
           },
           onBlind: (e) => {
-            const hit = (m: ChatMessage) => m.msgTime === e.messageTime && m.userIdHash === e.userIdHash;
+            const hit = (m: ChatMessage) => isBlindTarget(m, e);
             pending = pending.map((m) => (hit(m) ? { ...m, blinded: true } : m));
             setMessages((prev) => (prev.some(hit) ? prev.map((m) => (hit(m) ? { ...m, blinded: true } : m)) : prev));
             markLogBlinded(channelId, e);

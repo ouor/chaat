@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { chatKey } from '@/client/chzzk/protocol';
 import type { ChatMessage } from '@/client/chzzk/types';
 import { ChatRow, ProfileThumb } from '@/components/chat/chat-row';
 import { ChannelAvatar } from '@/components/channel/channel-avatar';
@@ -23,7 +24,7 @@ import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { LiveBadge } from '@/components/ui/live-badge';
 import { ScreenHeader } from '@/components/ui/screen-header';
-import { ANONYMOUS_DONOR } from '@/constants/chat-text';
+import { displayNickname } from '@/constants/chat-text';
 import { Radius, Spacing, TOUCH, Type } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
@@ -40,10 +41,6 @@ const CONN_META: Record<string, { label: string; color: 'primarySoft' | 'mute' |
   offline: { label: '연결 끊김', color: 'danger' },
   unavailable: { label: '채팅 없음', color: 'mute' },
 };
-
-function chatKey(m: ChatMessage): string {
-  return `${m.msgTime}:${m.userIdHash}:${m.message}`;
-}
 
 const ROLE_LABEL: Record<ChatMessage['role'], string> = {
   streamer: '스트리머',
@@ -483,12 +480,12 @@ export default function ChatScreen() {
             <View style={styles.sheetHead}>
               <ProfileThumb
                 uri={selected.profileImageUrl || selectedImage}
-                name={selected.nickname || ANONYMOUS_DONOR}
+                name={displayNickname(selected.nickname, selected.msgType)}
                 size={52}
               />
               <View style={styles.sheetTitle}>
                 <Text style={[Type.title, { color: theme.ink }]} numberOfLines={1}>
-                  {selected.nickname || ANONYMOUS_DONOR}
+                  {displayNickname(selected.nickname, selected.msgType)}
                 </Text>
                 <Text style={[Type.caption, { color: theme.mute }]}>{selectedMeta}</Text>
               </View>

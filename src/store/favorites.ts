@@ -51,10 +51,6 @@ function write(list: FavoriteChannel[]): void {
   for (const l of listeners) l();
 }
 
-export function isFavorite(channelId: string): boolean {
-  return read().some((f) => f.channelId === channelId);
-}
-
 export function toggleFavorite(
   f: { channelId: string; channelName: string; channelImageUrl: string },
 ): boolean {

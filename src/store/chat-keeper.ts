@@ -3,8 +3,9 @@
 import { AppState, PermissionsAndroid, Platform } from 'react-native';
 
 import { stripEmoji } from '@/client/chzzk/emoji';
+import { chatKey } from '@/client/chzzk/protocol';
 import type { ChatMessage } from '@/client/chzzk/types';
-import { ANONYMOUS_DONOR } from '@/constants/chat-text';
+import { displayNickname } from '@/constants/chat-text';
 
 import {
   chatKeeperHeartbeat,
@@ -28,16 +29,16 @@ const SEEN = 200;
 const HEARTBEAT_TICKS = 10;
 
 /** A chat as one notification line, or null for what shouldn't be shown there. */
-export function keeperLine(m: ChatMessage): KeeperMessage | null {
+function keeperLine(m: ChatMessage): KeeperMessage | null {
   if (m.blinded || m.msgType === 'system') return null;
   const { text, hadEmoji } = stripEmoji(m.message);
   const body = text || (hadEmoji ? '(이모티콘)' : '');
   if (m.msgType === 'donation') {
     const amount = m.donationAmount ? ` ₩${m.donationAmount.toLocaleString()}` : '';
-    return { nickname: m.nickname || ANONYMOUS_DONOR, text: `후원${amount}${body ? ` · ${body}` : ''}`, time: m.msgTime };
+    return { nickname: displayNickname(m.nickname, m.msgType), text: `후원${amount}${body ? ` · ${body}` : ''}`, time: m.msgTime };
   }
   if (!body) return null;
-  return { nickname: m.nickname || '익명', text: body, time: m.msgTime };
+  return { nickname: displayNickname(m.nickname, m.msgType), text: body, time: m.msgTime };
 }
 
 /**
@@ -136,7 +137,7 @@ export function startKeeper(title: string, onStopped: (reason: KeeperStopReason)
     push: (m) => {
       const line = keeperLine(m);
       if (!line || stopped) return;
-      const key = `${m.msgTime}:${m.userIdHash}:${m.message}`;
+      const key = chatKey(m);
       if (seen.has(key)) return;
       seen.add(key);
       if (seen.size > SEEN) seen.delete(seen.values().next().value as string);

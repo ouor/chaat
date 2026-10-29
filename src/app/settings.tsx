@@ -14,7 +14,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
 import { updateSettings, useSettings, type ChatVariant, type FontScale, type RetentionDays, type ThemeMode } from '@/store/settings';
 import { isChatKeeperAvailable } from '@/store/chat-keeper';
-import { applyRetention, clearSavedChats, countSavedChats } from '@/store/chat-logs';
+import { clearSavedChats, countLogs, pruneLogs } from '@/store/chat-logs';
 
 function Card({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   const theme = useTheme();
@@ -50,7 +50,7 @@ export default function SettingsScreen() {
   const [logoutFailed, setLogoutFailed] = useState(false);
 
   const refreshCount = useCallback(() => {
-    void countSavedChats().then(setLogCount);
+    void countLogs().then(setLogCount);
   }, []);
 
   useFocusEffect(refreshCount);
@@ -160,7 +160,7 @@ export default function SettingsScreen() {
               value={settings.retentionDays}
               onSelect={(v) => {
                 updateSettings({ retentionDays: v });
-                void applyRetention(v).then(refreshCount);
+                void pruneLogs(v).then(refreshCount);
               }}
             />
           </Field>
