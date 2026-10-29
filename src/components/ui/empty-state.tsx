@@ -1,4 +1,4 @@
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 
 import { type IconName } from '@/components/ui/icon';
 import { IconTile } from '@/components/ui/icon-tile';
@@ -16,17 +16,23 @@ export function EmptyState({
   hint,
   loading = false,
   children,
+  style,
+  onLayout,
 }: {
   icon?: IconName;
   title?: string;
   hint?: string;
   loading?: boolean;
   children?: React.ReactNode;
+  // As a list's ListEmptyComponent, the list injects these (an inverted list's flip-back
+  // transform and its layout probe); dropping them renders the state upside down.
+  style?: StyleProp<ViewStyle>;
+  onLayout?: (e: LayoutChangeEvent) => void;
 }) {
   const theme = useTheme();
   if (loading) {
     return (
-      <View style={styles.wrap}>
+      <View style={[styles.wrap, style]} onLayout={onLayout}>
         <ActivityIndicator color={theme.mute} />
         {title ? (
           <Text variant="label" tone="mute">
@@ -37,7 +43,7 @@ export function EmptyState({
     );
   }
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, style]} onLayout={onLayout}>
       {icon ? (
         <View style={styles.icon}>
           <IconTile name={icon} size="xl" tone="mute" />
