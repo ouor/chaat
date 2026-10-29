@@ -1,16 +1,20 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { searchChannels } from '@/store/channel';
 import type { SearchChannel } from '@/client/chzzk/types';
-import { ChannelAvatar } from '@/components/channel/channel-avatar';
+import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { LiveBadge } from '@/components/ui/live-badge';
-import { Radius, Spacing, TOUCH, Type } from '@/constants/tokens';
+import { SearchField } from '@/components/ui/search-field';
+import { Tag } from '@/components/ui/tag';
+import { Text } from '@/components/ui/text';
+import { Opacity, Radius, Size, Spacing } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { toggleFavorite, useFavorites } from '@/store/favorites';
 import { addRecentSearch, clearRecentSearches, getRecentSearches, removeRecentSearch } from '@/store/recents';
@@ -129,26 +133,14 @@ export default function SearchScreen() {
     <View style={[styles.root, { backgroundColor: theme.canvas }]}>
       <SafeAreaView edges={['top']} style={styles.header}>
         <IconButton name="back" label="뒤로" onPress={() => router.back()} />
-        <View style={[styles.inputWrap, { backgroundColor: theme.canvasSoft }]}>
-          <Icon name="search" color={theme.mute} size={18} />
-          <TextInput
-            value={q}
-            onChangeText={setQ}
-            placeholder="채널 이름으로 검색"
-            placeholderTextColor={theme.mute}
-            autoFocus
-            returnKeyType="search"
-            onSubmitEditing={() => query && setRecents(addRecentSearch(query))}
-            style={[Type.body, styles.input, { color: theme.ink }]}
-          />
-          {q ? (
-            <Pressable onPress={() => setQ('')} hitSlop={10} accessibilityLabel="검색어 지우기">
-              <View style={[styles.clear, { backgroundColor: theme.canvasSoft2 }]}>
-                <Icon name="close" color={theme.body} size={12} />
-              </View>
-            </Pressable>
-          ) : null}
-        </View>
+        <SearchField
+          value={q}
+          onChangeText={setQ}
+          placeholder="채널 이름으로 검색"
+          autoFocus
+          onSubmitEditing={() => query && setRecents(addRecentSearch(query))}
+          style={styles.search}
+        />
       </SafeAreaView>
 
       {query ? (
@@ -168,23 +160,19 @@ export default function SearchScreen() {
                   accessibilityLabel={`${ch.channelName} 채팅 열기`}
                   style={({ pressed }) => [
                     styles.rowMain,
-                    pressed && { backgroundColor: theme.canvasSoft },
+                    pressed && { backgroundColor: theme.surface },
                     dim && styles.dim,
                   ]}>
-                  <ChannelAvatar uri={ch.channelImageUrl} name={ch.channelName} size={48} />
+                  <Avatar uri={ch.channelImageUrl} name={ch.channelName} size="md" />
                   <View style={styles.rowText}>
                     <View style={styles.rowTitle}>
-                      <Text style={[Type.bodyStrong, styles.rowName, { color: theme.ink }]} numberOfLines={1}>
+                      <Text variant="bodyStrong" style={styles.rowName} numberOfLines={1}>
                         {ch.channelName}
                       </Text>
-                      {ch.verifiedMark ? (
-                        <View style={[styles.verified, { backgroundColor: theme.canvasSoft2 }]}>
-                          <Text style={[Type.badge, { color: theme.body }]}>인증</Text>
-                        </View>
-                      ) : null}
+                      {ch.verifiedMark ? <Tag label="인증" /> : null}
                       {ch.openLive ? <LiveBadge /> : null}
                     </View>
-                    <Text style={[Type.caption, { color: theme.mute }]}>
+                    <Text variant="caption" tone="mute">
                       팔로워 {formatFollowers(ch.followerCount)}명
                     </Text>
                   </View>
@@ -207,7 +195,7 @@ export default function SearchScreen() {
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={
             data.length > 0 ? (
-              <Text style={[Type.caption, styles.listHint, { color: theme.mute }]}>
+              <Text variant="caption" tone="mute" style={styles.listHint}>
                 ☆ 을 누르면 홈에 즐겨찾기로 저장돼요
               </Text>
             ) : null
@@ -216,34 +204,21 @@ export default function SearchScreen() {
             loadingMore ? (
               <ActivityIndicator color={theme.mute} style={styles.footerSpinner} />
             ) : !smallVisible && small.length > 0 ? (
-              <Pressable
-                onPress={() => setShowSmall(true)}
-                style={({ pressed }) => [styles.moreButton, { backgroundColor: pressed ? theme.canvasSoft2 : theme.canvasSoft }]}>
-                <Text style={[Type.label, { color: theme.body }]}>팔로워가 적은 채널 {small.length}개 더 보기</Text>
-              </Pressable>
+              <View style={styles.more}>
+                <Button label={`팔로워가 적은 채널 ${small.length}개 더 보기`} variant="tonal" onPress={() => setShowSmall(true)} />
+              </View>
             ) : null
           }
           ListEmptyComponent={
-            <View style={styles.empty}>
-              {initialLoading ? (
-                <ActivityIndicator color={theme.mute} />
-              ) : failed ? (
-                <>
-                  <Text style={[Type.bodyStrong, { color: theme.ink }]}>검색하지 못했어요</Text>
-                  <Text style={[Type.label, styles.emptyHint, { color: theme.mute }]}>
-                    인터넷 연결을 확인하고 다시 시도해 주세요.
-                  </Text>
-                  <Button label="다시 시도" variant="secondary" onPress={() => setAttempt((a) => a + 1)} />
-                </>
-              ) : (
-                <>
-                  <Text style={[Type.bodyStrong, { color: theme.ink }]}>‘{query}’ 채널이 없어요</Text>
-                  <Text style={[Type.label, styles.emptyHint, { color: theme.mute }]}>
-                    맞춤법을 확인하거나 다른 이름으로 검색해 보세요.
-                  </Text>
-                </>
-              )}
-            </View>
+            initialLoading ? (
+              <EmptyState loading />
+            ) : failed ? (
+              <EmptyState title="검색하지 못했어요" hint="인터넷 연결을 확인하고 다시 시도해 주세요.">
+                <Button label="다시 시도" variant="secondary" onPress={() => setAttempt((a) => a + 1)} />
+              </EmptyState>
+            ) : (
+              <EmptyState title={`‘${query}’ 채널이 없어요`} hint="맞춤법을 확인하거나 다른 이름으로 검색해 보세요." />
+            )
           }
         />
       ) : (
@@ -251,28 +226,28 @@ export default function SearchScreen() {
           {recents.length > 0 ? (
             <>
               <View style={styles.recentHeader}>
-                <Text style={[Type.heading, { color: theme.ink }]}>최근 검색</Text>
+                <Text variant="heading">최근 검색</Text>
                 <Pressable
                   onPress={() => {
                     clearRecentSearches();
                     setRecents([]);
                   }}
                   hitSlop={12}>
-                  <Text style={[Type.label, { color: theme.mute }]}>전체 삭제</Text>
+                  <Text variant="label" tone="mute">전체 삭제</Text>
                 </Pressable>
               </View>
               <View style={styles.recentWrap}>
                 {recents.map((r) => (
-                  <View key={r} style={[styles.recentChip, { backgroundColor: theme.canvasSoft }]}>
+                  <View key={r} style={[styles.recentChip, { backgroundColor: theme.surface }]}>
                     <Pressable onPress={() => setQ(r)} style={styles.recentLabel}>
-                      <Text style={[Type.label, { color: theme.ink }]}>{r}</Text>
+                      <Text variant="label">{r}</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => setRecents(removeRecentSearch(r))}
                       hitSlop={8}
                       accessibilityLabel={`${r} 검색 기록 지우기`}
                       style={styles.recentRemove}>
-                      <Icon name="close" color={theme.mute} size={14} />
+                      <Icon name="close" color={theme.mute} size="sm" />
                     </Pressable>
                   </View>
                 ))}
@@ -280,8 +255,8 @@ export default function SearchScreen() {
             </>
           ) : (
             <View style={styles.guide}>
-              <Text style={[Type.bodyStrong, { color: theme.ink }]}>어떤 채널을 찾으세요?</Text>
-              <Text style={[Type.label, { color: theme.mute, fontWeight: 400 }]}>
+              <Text variant="bodyStrong">어떤 채널을 찾으세요?</Text>
+              <Text variant="labelRegular" tone="mute">
                 스트리머 이름이나 채널 이름을 입력해 보세요.{'\n'}방송 중이 아니어도 채팅을 볼 수 있어요.
               </Text>
             </View>
@@ -302,17 +277,7 @@ const styles = StyleSheet.create({
     paddingRight: Spacing.lg,
     paddingVertical: Spacing.xs,
   },
-  inputWrap: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    height: TOUCH,
-    paddingHorizontal: Spacing.md,
-    borderRadius: Radius.lg,
-  },
-  input: { flex: 1, height: TOUCH, paddingVertical: 0 },
-  clear: { width: 20, height: 20, borderRadius: Radius.pill, alignItems: 'center', justifyContent: 'center' },
+  search: { flex: 1 },
   list: { flex: 1 },
   listContent: { flexGrow: 1, paddingBottom: Spacing.xxl },
   listHint: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md, paddingBottom: Spacing.xs },
@@ -326,22 +291,12 @@ const styles = StyleSheet.create({
     paddingRight: Spacing.sm,
     paddingVertical: Spacing.md,
   },
-  dim: { opacity: 0.6 },
-  rowText: { flex: 1, minWidth: 0, gap: 2 },
+  dim: { opacity: Opacity.dim },
+  rowText: { flex: 1, minWidth: 0, gap: Spacing.xxs },
   rowTitle: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   rowName: { flexShrink: 1 },
-  verified: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.xs },
   footerSpinner: { paddingVertical: Spacing.xl },
-  moreButton: {
-    marginHorizontal: Spacing.xl,
-    marginTop: Spacing.md,
-    minHeight: TOUCH,
-    borderRadius: Radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  empty: { alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.xxxxl, paddingTop: 96 },
-  emptyHint: { textAlign: 'center', fontWeight: 400, marginBottom: Spacing.sm },
+  more: { marginHorizontal: Spacing.xl, marginTop: Spacing.md },
   idle: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.lg },
   recentHeader: {
     flexDirection: 'row',
@@ -350,8 +305,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   recentWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  recentChip: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.pill, height: 38 },
-  recentLabel: { paddingLeft: Spacing.lg, paddingRight: Spacing.xs, height: 38, justifyContent: 'center' },
-  recentRemove: { paddingLeft: Spacing.xs, paddingRight: Spacing.md, height: 38, justifyContent: 'center' },
+  recentChip: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.pill, height: Size.chip },
+  recentLabel: { paddingLeft: Spacing.lg, paddingRight: Spacing.xs, height: Size.chip, justifyContent: 'center' },
+  recentRemove: { paddingLeft: Spacing.xs, paddingRight: Spacing.md, height: Size.chip, justifyContent: 'center' },
   guide: { gap: Spacing.sm, paddingTop: Spacing.sm },
 });

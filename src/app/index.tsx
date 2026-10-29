@@ -1,17 +1,19 @@
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ChannelAvatar } from '@/components/channel/channel-avatar';
 import { ChatPreview } from '@/components/chat/chat-preview';
+import { Avatar } from '@/components/ui/avatar';
 import { Brand } from '@/components/ui/brand';
 import { Button } from '@/components/ui/button';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
+import { IconTile } from '@/components/ui/icon-tile';
 import { LiveBadge } from '@/components/ui/live-badge';
-import { Radius, Spacing, TOUCH, Type } from '@/constants/tokens';
+import { Text } from '@/components/ui/text';
+import { Radius, Spacing, TOUCH } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { loadLiveSummaries, type LiveSummary } from '@/store/channel';
 import { useFavorites, type FavoriteChannel } from '@/store/favorites';
@@ -73,29 +75,27 @@ export default function HomeScreen() {
       {favorites.length === 0 ? (
         <>
           <ScrollView contentContainerStyle={styles.onboard}>
-            <Text style={[Type.hero, { color: theme.ink }]}>
+            <Text variant="hero">
               방송이 끝나도{'\n'}채팅은 그대로 남아요
             </Text>
-            <Text style={[Type.body, styles.onboardSub, { color: theme.body }]}>
+            <Text variant="body" tone="body" style={styles.onboardSub}>
               치지직 채팅만 가볍게 보는 앱이에요.{'\n'}로그인 없이 바로 볼 수 있어요.
             </Text>
             <View style={styles.features}>
               {FEATURES.map((f) => (
                 <View key={f.title} style={styles.feature}>
-                  <View style={[styles.featureIcon, { backgroundColor: theme.canvasSoft }]}>
-                    <Icon name={f.icon} color={theme.ink} size={22} />
-                  </View>
+                  <IconTile name={f.icon} size="lg" shape="rounded" />
                   <View style={styles.featureText}>
-                    <Text style={[Type.bodyStrong, { color: theme.ink }]}>{f.title}</Text>
-                    <Text style={[Type.label, { color: theme.mute, fontWeight: 400 }]}>{f.body}</Text>
+                    <Text variant="bodyStrong">{f.title}</Text>
+                    <Text variant="labelRegular" tone="mute">{f.body}</Text>
                   </View>
                 </View>
               ))}
             </View>
-            <ChatPreview label="채팅은 이렇게 보여요" surface="canvasSoft" />
+            <ChatPreview label="채팅은 이렇게 보여요" surface="surface" />
           </ScrollView>
           <SafeAreaView edges={['bottom']} style={[styles.footer, { backgroundColor: theme.canvas }]}>
-            <Text style={[Type.caption, styles.footerHint, { color: theme.mute }]}>
+            <Text variant="caption" tone="mute" style={styles.footerHint}>
               자주 보는 채널을 즐겨찾기하면 여기에 모여요
             </Text>
             <Button label="보고 싶은 채널 찾기" size="lg" onPress={() => router.push('/search')} />
@@ -108,15 +108,15 @@ export default function HomeScreen() {
             accessibilityRole="search"
             style={({ pressed }) => [
               styles.searchBar,
-              { backgroundColor: pressed ? theme.canvasSoft2 : theme.canvasSoft },
+              { backgroundColor: pressed ? theme.surfaceRaised : theme.surface },
             ]}>
-            <Icon name="search" color={theme.mute} size={20} />
-            <Text style={[Type.body, { color: theme.mute }]}>채널 이름으로 검색</Text>
+            <Icon name="search" color={theme.mute} size="md" />
+            <Text variant="body" tone="mute">채널 이름으로 검색</Text>
           </Pressable>
 
           <View style={styles.sectionHeader}>
-            <Text style={[Type.heading, { color: theme.ink }]}>즐겨찾기</Text>
-            <Text style={[Type.label, { color: theme.mute }]}>
+            <Text variant="heading">즐겨찾기</Text>
+            <Text variant="label" tone="mute">
               {liveCount > 0 ? `${favorites.length}개 중 ${liveCount}개 방송 중` : `${favorites.length}개`}
             </Text>
           </View>
@@ -149,30 +149,30 @@ export default function HomeScreen() {
                   onPress={() => router.push(`/chat/${item.channelId}`)}
                   accessibilityRole="button"
                   accessibilityLabel={`${item.channelName} 채팅 열기`}
-                  style={({ pressed }) => [styles.row, pressed && { backgroundColor: theme.canvasSoft }]}>
-                  <ChannelAvatar uri={item.channelImageUrl} name={item.channelName} size={48} />
+                  style={({ pressed }) => [styles.row, pressed && { backgroundColor: theme.surface }]}>
+                  <Avatar uri={item.channelImageUrl} name={item.channelName} size="md" />
                   <View style={styles.rowText}>
                     <View style={styles.rowTitle}>
-                      <Text style={[Type.bodyStrong, styles.rowName, { color: theme.ink }]} numberOfLines={1}>
+                      <Text variant="bodyStrong" style={styles.rowName} numberOfLines={1}>
                         {item.channelName}
                       </Text>
                       {isOpen ? <LiveBadge /> : null}
                     </View>
-                    <Text style={[Type.caption, { color: isOpen ? theme.primarySoft : theme.mute }]}>{sub}</Text>
+                    <Text variant="caption" tone={isOpen ? 'accentText' : 'mute'}>
+                      {sub}
+                    </Text>
                   </View>
-                  <Icon name="chevron" color={theme.mute} size={18} />
+                  <Icon name="chevron" color={theme.mute} size="md" />
                 </Pressable>
               );
             }}
             keyExtractor={(item) => item.channelId}
             ListFooterComponent={
-              <View style={[styles.tip, { backgroundColor: theme.canvasSoft }]}>
-                <View style={[styles.tipIcon, { backgroundColor: theme.canvasSoft2 }]}>
-                  <Icon name="history" color={theme.ink} size={20} />
-                </View>
+              <View style={[styles.tip, { backgroundColor: theme.surface }]}>
+                <IconTile name="history" surface="surfaceRaised" />
                 <View style={styles.tipText}>
-                  <Text style={[Type.label, { color: theme.ink, fontWeight: 700 }]}>방송이 끝나도 들어가 보세요</Text>
-                  <Text style={[Type.caption, { color: theme.mute }]}>
+                  <Text variant="labelStrong">방송이 끝나도 들어가 보세요</Text>
+                  <Text variant="caption" tone="mute">
                     채팅방은 계속 열려 있어요. 채팅방 오른쪽 위 ‘지난 채팅’에서 저장된 채팅도 다시 볼 수 있어요.
                   </Text>
                 </View>
@@ -200,21 +200,14 @@ const styles = StyleSheet.create({
   onboardSub: { marginTop: Spacing.md },
   features: { marginTop: Spacing.xxxl, marginBottom: Spacing.xxl, gap: Spacing.xl },
   feature: { flexDirection: 'row', gap: Spacing.lg, alignItems: 'flex-start' },
-  featureIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: Radius.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  featureText: { flex: 1, gap: 2, paddingTop: 2 },
+  featureText: { flex: 1, gap: Spacing.xxs, paddingTop: Spacing.xxs },
   footer: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md, paddingBottom: Spacing.lg },
   footerHint: { textAlign: 'center', marginBottom: Spacing.md },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    height: TOUCH + 4,
+    height: TOUCH,
     marginHorizontal: Spacing.lg,
     marginTop: Spacing.xs,
     paddingHorizontal: Spacing.lg,
@@ -238,8 +231,7 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     borderRadius: Radius.xl,
   },
-  tipIcon: { width: 40, height: 40, borderRadius: Radius.pill, alignItems: 'center', justifyContent: 'center' },
-  tipText: { flex: 1, gap: 2 },
+  tipText: { flex: 1, gap: Spacing.xxs },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -247,7 +239,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.md,
   },
-  rowText: { flex: 1, minWidth: 0, gap: 2 },
+  rowText: { flex: 1, minWidth: 0, gap: Spacing.xxs },
   rowTitle: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   rowName: { flexShrink: 1 },
 });

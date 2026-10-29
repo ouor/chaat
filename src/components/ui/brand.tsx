@@ -1,7 +1,8 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-import { Radius, Type } from '@/constants/tokens';
+import { Text } from '@/components/ui/text';
+import { Radius, Spacing } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -23,15 +24,16 @@ export function Brand() {
         </Svg>
       </View>
       <View>
-        <Text style={[Type.heading, styles.word, { color: theme.ink }]}>chaat</Text>
-        <Text style={[Type.micro, { color: theme.mute }]}>챗 · 치지직 채팅 보기</Text>
+        <Text variant="wordmark">chaat</Text>
+        <Text variant="micro" tone="mute">
+          챗 · 치지직 채팅 보기
+        </Text>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  mark: { width: MARK, height: MARK, borderRadius: Radius.md + 2, alignItems: 'center', justifyContent: 'center' },
-  word: { lineHeight: 20, letterSpacing: -0.4 },
+  wrap: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  mark: { width: MARK, height: MARK, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
 });

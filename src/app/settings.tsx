@@ -1,15 +1,17 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChatPreview } from '@/components/chat/chat-preview';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
+import { IconTile } from '@/components/ui/icon-tile';
+import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { Segmented } from '@/components/ui/segmented';
-import { Radius, Spacing, TOUCH, Type } from '@/constants/tokens';
+import { Opacity, Radius, Spacing, TOUCH } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
 import { updateSettings, useSettings, type ChatVariant, type FontScale, type RetentionDays, type ThemeMode } from '@/store/settings';
@@ -20,20 +22,19 @@ function Card({ title, description, children }: { title: string; description?: s
   const theme = useTheme();
   return (
     <View style={styles.section}>
-      <Text style={[Type.heading, styles.sectionTitle, { color: theme.ink }]}>{title}</Text>
+      <Text variant="heading" style={styles.sectionTitle}>{title}</Text>
       {description ? (
-        <Text style={[Type.label, styles.sectionDesc, { color: theme.mute }]}>{description}</Text>
+        <Text variant="labelRegular" tone="mute" style={styles.sectionDesc}>{description}</Text>
       ) : null}
-      <View style={[styles.card, { backgroundColor: theme.canvasSoft }]}>{children}</View>
+      <View style={[styles.card, { backgroundColor: theme.surface }]}>{children}</View>
     </View>
   );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  const theme = useTheme();
   return (
     <View style={styles.field}>
-      <Text style={[Type.label, { color: theme.body, fontWeight: 600 }]}>{label}</Text>
+      <Text variant="labelStrong" tone="body">{label}</Text>
       {children}
     </View>
   );
@@ -60,15 +61,14 @@ export default function SettingsScreen() {
       <ScreenHeader title="설정" />
 
       <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + Spacing.xxxl }]}>
-        <View style={[styles.account, { backgroundColor: theme.canvasSoft }]}>
-          <View style={[styles.accountIcon, { backgroundColor: theme.canvasSoft2 }]}>
-            <Icon name={loggedIn ? 'check' : 'lock'} color={theme.body} size={20} />
-          </View>
+        <View style={styles.accountBlock}>
+        <View style={[styles.account, { backgroundColor: theme.surface }]}>
+          <IconTile name={loggedIn ? 'check' : 'lock'} surface="surfaceRaised" tone="body" />
           <View style={styles.accountInfo}>
-            <Text style={[Type.bodyStrong, { color: theme.ink }]}>
+            <Text variant="bodyStrong">
               {loggedIn ? '네이버로 로그인했어요' : '로그인하지 않았어요'}
             </Text>
-            <Text style={[Type.caption, { color: theme.mute }]}>
+            <Text variant="caption" tone="mute">
               {loggedIn ? '로그인 정보는 이 폰의 보안 저장소에만 있어요' : '채팅 보기는 로그인 없이도 돼요'}
             </Text>
           </View>
@@ -86,12 +86,12 @@ export default function SettingsScreen() {
             <Button label="로그인" size="sm" onPress={() => router.push('/login')} />
           )}
         </View>
-
         {logoutFailed ? (
-          <Text style={[Type.micro, styles.logoutError, { color: theme.danger }]}>
+          <Text variant="micro" tone="danger" style={styles.logoutError}>
             로그아웃하지 못했어요. 잠시 뒤 다시 눌러 주세요.
           </Text>
         ) : null}
+        </View>
 
         <Card title="화면">
           <Field label="테마">
@@ -107,10 +107,10 @@ export default function SettingsScreen() {
           <Field label="채팅 글자 크기">
             <Segmented<FontScale>
               options={[
-                { label: '작게', value: 'sm', fontSize: 13 },
-                { label: '보통', value: 'md', fontSize: 15 },
-                { label: '크게', value: 'lg', fontSize: 17 },
-                { label: '최대', value: 'xl', fontSize: 19 },
+                { label: '작게', value: 'sm' },
+                { label: '보통', value: 'md' },
+                { label: '크게', value: 'lg' },
+                { label: '최대', value: 'xl' },
               ]}
               value={settings.fontScale}
               onSelect={(v) => updateSettings({ fontScale: v })}
@@ -142,7 +142,7 @@ export default function SettingsScreen() {
                 value={settings.backgroundCollect ? 'on' : 'off'}
                 onSelect={(v) => updateSettings({ backgroundCollect: v === 'on' })}
               />
-              <Text style={[Type.micro, { color: theme.mute }]}>
+              <Text variant="micro" tone="mute">
                 {settings.backgroundCollect
                   ? '홈으로 나가거나 화면을 꺼도 채팅을 계속 받아 저장하고, 새 채팅을 알림으로 보여 줘요. 배터리를 조금 더 써요.'
                   : '앱을 내려 두면 채팅을 받지 않아요. 채팅방을 다시 열면 그때부터 저장돼요.'}
@@ -164,10 +164,10 @@ export default function SettingsScreen() {
               }}
             />
           </Field>
-          <View style={[styles.divider, { backgroundColor: theme.hairline }]} />
+          <View style={[styles.storage, { borderTopColor: theme.hairline }]}>
           <View style={styles.statRow}>
-            <Text style={[Type.label, { color: theme.body }]}>저장된 채팅</Text>
-            <Text style={[Type.label, { color: theme.ink, fontWeight: 700 }]}>
+            <Text variant="label" tone="body">저장된 채팅</Text>
+            <Text variant="labelStrong">
               {logCount === null ? '…' : `${logCount.toLocaleString()}개`}
             </Text>
           </View>
@@ -175,24 +175,25 @@ export default function SettingsScreen() {
             onPress={() => setConfirmClear(true)}
             disabled={!logCount}
             accessibilityRole="button"
-            style={({ pressed }) => [styles.linkRow, { opacity: !logCount ? 0.4 : pressed ? 0.6 : 1 }]}>
-            <Text style={[Type.label, { color: theme.danger }]}>저장된 채팅 모두 지우기</Text>
-            <Icon name="chevron" color={theme.mute} size={16} />
+            style={({ pressed }) => [styles.linkRow, { opacity: !logCount ? Opacity.disabled : pressed ? Opacity.pressed : 1 }]}>
+            <Text variant="label" tone="danger">저장된 채팅 모두 지우기</Text>
+            <Icon name="chevron" color={theme.mute} size="sm" />
           </Pressable>
+          </View>
         </Card>
 
-        <Text style={[Type.micro, styles.footer, { color: theme.mute }]}>
+        <Text variant="caption" tone="mute" style={styles.footer}>
           chaat은 치지직 공식 앱이 아니에요.{'\n'}채팅 기록은 이 폰에만 저장되고 어디에도 보내지 않아요.
         </Text>
       </ScrollView>
 
-      <BottomSheet visible={confirmClear} onClose={() => setConfirmClear(false)}>
-        <View style={styles.sheet}>
-          <Text style={[Type.title, { color: theme.ink }]}>저장된 채팅을 모두 지울까요?</Text>
-          <Text style={[Type.body, { color: theme.mute }]}>
-            {logCount ? `${logCount.toLocaleString()}개의 채팅이 지워져요. ` : ''}지운 채팅은 되돌릴 수 없어요.
-          </Text>
-          <View style={styles.sheetActions}>
+      <BottomSheet
+        visible={confirmClear}
+        onClose={() => setConfirmClear(false)}
+        title="저장된 채팅을 모두 지울까요?"
+        description={`${logCount ? `${logCount.toLocaleString()}개의 채팅이 지워져요. ` : ''}지운 채팅은 되돌릴 수 없어요.`}
+        actions={
+          <>
             <Button label="취소" variant="secondary" stretch onPress={() => setConfirmClear(false)} />
             <Button
               label="모두 지우기"
@@ -203,9 +204,9 @@ export default function SettingsScreen() {
                 void clearSavedChats().then(refreshCount);
               }}
             />
-          </View>
-        </View>
-      </BottomSheet>
+          </>
+        }
+      />
     </View>
   );
 }
@@ -220,30 +221,22 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     borderRadius: Radius.xl,
   },
-  accountIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  accountInfo: { flex: 1, gap: 2 },
-  logoutError: { marginTop: -Spacing.xxl, paddingHorizontal: Spacing.xs },
+  accountBlock: { gap: Spacing.sm },
+  accountInfo: { flex: 1, gap: Spacing.xxs },
+  logoutError: { paddingHorizontal: Spacing.xs },
   section: { gap: Spacing.sm },
   sectionTitle: { paddingHorizontal: Spacing.xs },
-  sectionDesc: { paddingHorizontal: Spacing.xs, fontWeight: 400 },
+  sectionDesc: { paddingHorizontal: Spacing.xs },
   card: { borderRadius: Radius.xl, padding: Spacing.lg, gap: Spacing.xl },
   field: { gap: Spacing.sm },
-  divider: { height: StyleSheet.hairlineWidth, marginVertical: -Spacing.sm },
+  // Count + clear, set off from the fields above by a hairline instead of the card gap.
+  storage: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: Spacing.md },
   statRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   linkRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     minHeight: TOUCH,
-    marginVertical: -Spacing.md,
   },
-  footer: { textAlign: 'center', lineHeight: 18 },
-  sheet: { gap: Spacing.md },
-  sheetActions: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm },
+  footer: { textAlign: 'center' },
 });

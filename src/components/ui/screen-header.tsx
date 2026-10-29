@@ -1,9 +1,10 @@
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconButton } from '@/components/ui/icon-button';
-import { Spacing, Type } from '@/constants/tokens';
+import { Text } from '@/components/ui/text';
+import { Spacing } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
 /** Back button + title row shared by every pushed screen. `children` replaces the title. */
@@ -25,11 +26,11 @@ export function ScreenHeader({
       <IconButton name="back" label="뒤로" onPress={() => router.back()} />
       {children ?? (
         <View style={styles.titleWrap}>
-          <Text style={[Type.heading, { color: theme.ink }]} numberOfLines={1}>
+          <Text variant="heading" numberOfLines={1}>
             {title}
           </Text>
           {subtitle ? (
-            <Text style={[Type.micro, { color: theme.mute }]} numberOfLines={1}>
+            <Text variant="micro" tone="mute" numberOfLines={1}>
               {subtitle}
             </Text>
           ) : null}
@@ -45,7 +46,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
-    paddingHorizontal: Spacing.xs,
+    paddingLeft: Spacing.xs,
+    // Icon buttons carry their own 44dp box; a chip at the end needs the extra edge room.
+    paddingRight: Spacing.sm,
     paddingVertical: Spacing.xs,
   },
   titleWrap: { flex: 1, minWidth: 0 },

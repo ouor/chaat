@@ -1,8 +1,9 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import type { ChatMessage } from '@/client/chzzk/types';
 import { ChatRow } from '@/components/chat/chat-row';
-import { Radius, Spacing, Type, type ThemeColor } from '@/constants/tokens';
+import { Text } from '@/components/ui/text';
+import { Radius, Spacing } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
 const sample = (p: Partial<ChatMessage> & Pick<ChatMessage, 'nickname' | 'message'>): ChatMessage => ({
@@ -22,11 +23,13 @@ const SAMPLES: ChatMessage[] = [
 ];
 
 /** Static sample chat rendered with the real ChatRow, so it follows the font/layout settings. */
-export function ChatPreview({ label, surface = 'canvas' }: { label: string; surface?: ThemeColor }) {
+export function ChatPreview({ label, surface = 'canvas' }: { label: string; surface?: 'canvas' | 'surface' }) {
   const theme = useTheme();
   return (
     <View style={[styles.box, { backgroundColor: theme[surface] }]} accessibilityLabel={`${label}: 채팅 예시`}>
-      <Text style={[Type.micro, styles.label, { color: theme.mute }]}>{label}</Text>
+      <Text variant="micro" tone="mute" style={styles.label}>
+        {label}
+      </Text>
       {SAMPLES.map((m) => (
         <ChatRow key={m.nickname} m={m} />
       ))}

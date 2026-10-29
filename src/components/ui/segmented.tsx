@@ -1,6 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Radius, Spacing, TOUCH, Type } from '@/constants/tokens';
+import { Text } from '@/components/ui/text';
+
+import { Radius, Spacing, TOUCH } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -12,7 +14,7 @@ export function Segmented<T extends string | number>({
   value,
   onSelect,
 }: {
-  options: { label: string; value: T; fontSize?: number }[];
+  options: { label: string; value: T }[];
   value: T;
   onSelect: (v: T) => void;
 }) {
@@ -27,13 +29,8 @@ export function Segmented<T extends string | number>({
             onPress={() => onSelect(opt.value)}
             accessibilityRole="radio"
             accessibilityState={{ selected: active }}
-            style={[styles.item, active && { backgroundColor: theme.canvasSoft2 }]}>
-            <Text
-              style={[
-                Type.label,
-                { color: active ? theme.ink : theme.mute, fontWeight: active ? 700 : 500 },
-                opt.fontSize ? { fontSize: opt.fontSize, lineHeight: opt.fontSize + 6 } : null,
-              ]}>
+            style={[styles.item, active && { backgroundColor: theme.surfaceRaised }]}>
+            <Text variant={active ? 'labelStrong' : 'label'} tone={active ? 'ink' : 'mute'}>
               {opt.label}
             </Text>
           </Pressable>
@@ -43,12 +40,15 @@ export function Segmented<T extends string | number>({
   );
 }
 
+const TRACK_PAD = 3;
+
 const styles = StyleSheet.create({
-  track: { flexDirection: 'row', borderRadius: Radius.lg, padding: 3, gap: 3 },
+  track: { flexDirection: 'row', borderRadius: Radius.lg, padding: TRACK_PAD, gap: TRACK_PAD },
   item: {
     flex: 1,
-    minHeight: TOUCH - 4,
-    borderRadius: Radius.md + 1,
+    minHeight: TOUCH - 2 * TRACK_PAD,
+    // Concentric with the track's corner.
+    borderRadius: Radius.lg - TRACK_PAD,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: Spacing.xs,

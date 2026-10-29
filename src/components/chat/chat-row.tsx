@@ -1,17 +1,17 @@
-import { Image } from 'expo-image';
-import { memo, useState } from 'react';
+import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { ChatMessage } from '@/client/chzzk/types';
-import { ANONYMOUS_DONOR, BLINDED_TEXT } from '@/constants/chat-text';
-import { Radius, Spacing, Type } from '@/constants/tokens';
+import { Avatar } from '@/components/ui/avatar';
+import { Tag } from '@/components/ui/tag';
+import { Text as UIText } from '@/components/ui/text';
+import { BLINDED_TEXT, displayNickname } from '@/constants/chat-text';
+import { ChatFont, chatType, Radius, Size, Spacing } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { hhmm } from '@/lib/time';
 import { useProfileImage } from '@/store/profile-images';
-import { useSettings, type FontScale } from '@/store/settings';
+import { useSettings } from '@/store/settings';
 import { EmojiText } from '@/components/chat/emoji-text';
-
-export const CHAT_FONT: Record<FontScale, number> = { sm: 14, md: 15, lg: 17, xl: 20 };
 
 const NICKS = ['nick1', 'nick2', 'nick3', 'nick4', 'nick5', 'nick6'] as const;
 
@@ -23,50 +23,9 @@ function nickKey(hash: string): (typeof NICKS)[number] {
 }
 
 function RoleBadge({ role }: { role: ChatMessage['role'] }) {
-  const theme = useTheme();
-  if (role === 'streamer') {
-    return (
-      <View style={[styles.badge, { backgroundColor: theme.ink }]}>
-        <Text style={[Type.badge, { color: theme.canvas }]}>스트리머</Text>
-      </View>
-    );
-  }
-  if (role === 'manager') {
-    return (
-      <View style={[styles.badge, { backgroundColor: theme.canvasSoft2 }]}>
-        <Text style={[Type.badge, { color: theme.body }]}>매니저</Text>
-      </View>
-    );
-  }
+  if (role === 'streamer') return <Tag label="스트리머" tone="inverse" />;
+  if (role === 'manager') return <Tag label="매니저" />;
   return null;
-}
-
-export function ProfileThumb({ uri, name, size }: { uri?: string; name: string; size: number }) {
-  const theme = useTheme();
-  const [failed, setFailed] = useState(false);
-
-  if (failed || !uri) {
-    return (
-      <View
-        style={[
-          styles.thumbInitial,
-          { width: size, height: size, borderRadius: Radius.pill, backgroundColor: theme.canvasSoft2 },
-        ]}>
-        <Text style={[styles.thumbText, { color: theme.body, fontSize: Math.max(9, size * 0.45) }]}>
-          {(name[0] ?? '?').toUpperCase()}
-        </Text>
-      </View>
-    );
-  }
-  return (
-    <Image
-      source={{ uri }}
-      style={{ width: size, height: size, borderRadius: Radius.pill, backgroundColor: theme.canvasSoft }}
-      contentFit="cover"
-      cachePolicy="memory-disk"
-      onError={() => setFailed(true)}
-    />
-  );
 }
 
 export const ChatRow = memo(function ChatRow({
@@ -81,23 +40,27 @@ export const ChatRow = memo(function ChatRow({
 }) {
   const theme = useTheme();
   const { fontScale, chatVariant } = useSettings();
-  const font = CHAT_FONT[fontScale];
+  const t = chatType(ChatFont[fontScale]);
   const isCard = chatVariant === 'card';
   const emojis = emojiMap ?? {};
   // Subscribes to this row's user only, so one user's backfill doesn't re-render every row.
   const backfilledImage = useProfileImage(m.profileImageUrl ? '' : m.userIdHash);
   const profileImage = m.profileImageUrl || backfilledImage;
-  const nickStyle = { color: theme[nickKey(m.userIdHash || m.nickname)], fontSize: font - 1, lineHeight: font + 6 };
+  const nickStyle = [t.nick, { color: theme[nickKey(m.userIdHash || m.nickname)] }];
 
   const pressableProps = onPress ? { onPress: () => onPress(m) } : {};
   const body = m.blinded ? (
-    <Text style={{ color: theme.mute, fontSize: font, lineHeight: font + 6 }}>{BLINDED_TEXT}</Text>
+    <Text style={[t.body, { color: theme.mute }]}>{BLINDED_TEXT}</Text>
   ) : (
-    <EmojiText text={m.message} emojiMap={emojis} messageEmojis={m.emojis} fontSize={font} color={theme.ink} />
+    <EmojiText text={m.message} emojiMap={emojis} messageEmojis={m.emojis} fontSize={t.body.fontSize} color={theme.ink} />
   );
 
   if (m.msgType === 'system') {
-    return <Text style={[Type.caption, styles.system, { color: theme.mute }]}>{m.message}</Text>;
+    return (
+      <UIText variant="caption" tone="mute" style={styles.system}>
+        {m.message}
+      </UIText>
+    );
   }
 
   if (m.msgType === 'donation') {
@@ -109,12 +72,12 @@ export const ChatRow = memo(function ChatRow({
         {...pressableProps}
         style={[styles.dono, { backgroundColor: theme.primaryTint, borderLeftColor: theme.primary }]}>
         <View style={styles.donoHead}>
-          <Text style={[styles.donoNick, { fontSize: font - 1 }]} numberOfLines={1}>
-            <Text style={{ color: anonymous ? theme.body : theme.primarySoft }}>{anonymous ? ANONYMOUS_DONOR : m.nickname}</Text>
-            <Text style={{ color: theme.body, fontWeight: 400 }}> 님의 후원</Text>
+          <Text style={[styles.donoNick, t.donor]} numberOfLines={1}>
+            <Text style={{ color: anonymous ? theme.body : theme.accentText }}>{displayNickname(m.nickname, m.msgType)}</Text>
+            <Text style={[t.small, { color: theme.body }]}> 님의 후원</Text>
           </Text>
           {amount ? (
-            <Text style={[styles.donoAmount, { color: theme.primarySoft, fontSize: isCard ? font + 3 : font + 1 }]}>
+            <Text style={[styles.donoAmount, isCard ? t.amountCard : t.amount, { color: theme.accentText }]}>
               {amount}
             </Text>
           ) : null}
@@ -126,11 +89,9 @@ export const ChatRow = memo(function ChatRow({
 
   if (m.msgType === 'subscription') {
     return (
-      <View style={[styles.sub, { backgroundColor: theme.canvasSoft }]}>
-        <View style={[styles.badge, { backgroundColor: theme.canvasSoft2 }]}>
-          <Text style={[Type.badge, { color: theme.ink }]}>구독</Text>
-        </View>
-        <Text style={[styles.subText, { color: theme.body, fontSize: font - 1, lineHeight: font + 6 }]}>{m.blinded ? BLINDED_TEXT : m.message}</Text>
+      <View style={[styles.sub, { backgroundColor: theme.surface }]}>
+        <Tag label="구독" />
+        <Text style={[styles.subText, t.small, { color: theme.body }]}>{m.blinded ? BLINDED_TEXT : m.message}</Text>
       </View>
     );
   }
@@ -138,14 +99,16 @@ export const ChatRow = memo(function ChatRow({
   if (isCard) {
     return (
       <Pressable {...pressableProps} style={styles.cardRow}>
-        <ProfileThumb uri={profileImage} name={m.nickname} size={32} />
+        <Avatar uri={profileImage} name={m.nickname} size="sm" />
         <View style={styles.cardBody}>
           <View style={styles.cardNickLine}>
             <RoleBadge role={m.role} />
             <Text style={[styles.nick, styles.cardNick, nickStyle]} numberOfLines={1}>
               {m.nickname}
             </Text>
-            <Text style={[Type.micro, { color: theme.mute }]}>{hhmm(m.msgTime)}</Text>
+            <UIText variant="micro" tone="mute">
+              {hhmm(m.msgTime)}
+            </UIText>
           </View>
           {body}
         </View>
@@ -157,9 +120,11 @@ export const ChatRow = memo(function ChatRow({
   // quiet fixed column instead of a ragged right edge. Shown live and ended alike.
   return (
     <Pressable {...pressableProps} style={styles.chatRow}>
-      <Text style={[Type.micro, styles.time, { color: theme.mute, lineHeight: font + 6 }]}>{hhmm(m.msgTime)}</Text>
+      <UIText variant="micro" tone="mute" style={[styles.time, { lineHeight: t.lineHeight }]}>
+        {hhmm(m.msgTime)}
+      </UIText>
       {m.role !== 'member' ? (
-        <View style={[styles.thumbSlot, { height: font + 6 }]}>
+        <View style={[styles.badgeSlot, { height: t.lineHeight }]}>
           <RoleBadge role={m.role} />
         </View>
       ) : null}
@@ -177,31 +142,17 @@ const styles = StyleSheet.create({
   chatRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 6,
-    paddingVertical: 3,
+    gap: Spacing.tight,
+    paddingVertical: Spacing.xxs,
     paddingHorizontal: Spacing.lg,
   },
-  thumbSlot: { justifyContent: 'center' },
-  thumbInitial: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  thumbText: {
-    fontWeight: 600,
-  },
+  badgeSlot: { justifyContent: 'center' },
   nick: {
-    fontWeight: 600,
     flexShrink: 0,
     maxWidth: '38%',
   },
   message: { flex: 1, minWidth: 0 },
-  time: { width: 36, flexShrink: 0, fontVariant: ['tabular-nums'] },
-  badge: {
-    borderRadius: Radius.xs,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-  },
+  time: { width: Size.timeColumn, flexShrink: 0, fontVariant: ['tabular-nums'] },
   system: {
     textAlign: 'center',
     paddingVertical: Spacing.sm,
@@ -210,7 +161,7 @@ const styles = StyleSheet.create({
   dono: {
     borderLeftWidth: 3,
     borderRadius: Radius.lg,
-    marginVertical: 6,
+    marginVertical: Spacing.tight,
     marginHorizontal: Spacing.md,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
@@ -222,17 +173,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
   },
-  donoNick: {
-    flexShrink: 1,
-    fontWeight: 700,
-  },
-  donoAmount: {
-    fontWeight: 800,
-    fontVariant: ['tabular-nums'],
-  },
+  donoNick: { flexShrink: 1 },
+  donoAmount: { fontVariant: ['tabular-nums'] },
   sub: {
     borderRadius: Radius.lg,
-    marginVertical: 6,
+    marginVertical: Spacing.tight,
     marginHorizontal: Spacing.md,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
@@ -250,7 +195,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     alignItems: 'flex-start',
   },
-  cardBody: { flex: 1, minWidth: 0, gap: 2 },
-  cardNickLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  cardBody: { flex: 1, minWidth: 0, gap: Spacing.xxs },
+  cardNickLine: { flexDirection: 'row', alignItems: 'center', gap: Spacing.tight },
   cardNick: { flexShrink: 1, maxWidth: undefined },
 });

@@ -1,5 +1,7 @@
 import Svg, { Circle, Path } from 'react-native-svg';
 
+import { IconSize, type IconSizeName } from '@/constants/tokens';
+
 // 24-unit line icons (Feather-style, MIT shapes). One stroke weight so every screen reads the same.
 const STROKE = 2;
 
@@ -76,15 +78,16 @@ export type IconName =
 
 export function Icon({
   name,
-  size = 22,
+  size = 'lg',
   color,
 }: {
   name: IconName;
-  size?: number;
+  size?: IconSizeName;
   color: string;
 }) {
+  const px = IconSize[size];
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Svg width={px} height={px} viewBox="0 0 24 24" fill="none">
       {PATHS[name](color)}
     </Svg>
   );

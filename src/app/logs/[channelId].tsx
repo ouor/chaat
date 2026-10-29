@@ -1,13 +1,16 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
 
 import { EmojiText } from '@/components/chat/emoji-text';
 import { Button } from '@/components/ui/button';
-import { Icon } from '@/components/ui/icon';
+import { EmptyState } from '@/components/ui/empty-state';
+import { SearchField } from '@/components/ui/search-field';
+import { Tag } from '@/components/ui/tag';
+import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { BLINDED_TEXT, displayNickname } from '@/constants/chat-text';
-import { Radius, Spacing, TOUCH, Type } from '@/constants/tokens';
+import { Radius, Size, Spacing, Type } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { hhmm } from '@/lib/time';
 import { useAuth } from '@/store/auth-context';
@@ -119,7 +122,6 @@ export default function LogsScreen() {
       setExporting(false);
     }
   };
-  const canExport = rows.length > 0 && !exporting;
   const searching = debouncedQuery.trim() !== '';
 
   return (
@@ -129,76 +131,50 @@ export default function LogsScreen() {
         subtitle={rangeLabel(rows)}
         right={
           hasAny ? (
-            <Pressable
-              onPress={onExport}
-              disabled={!canExport}
-              accessibilityRole="button"
+            <Button
+              label="내보내기"
+              size="chip"
+              variant="tonal"
+              icon="export"
+              busy={exporting}
+              disabled={rows.length === 0}
               accessibilityLabel={searching ? '찾은 채팅을 CSV 파일로 내보내기' : '저장된 채팅을 CSV 파일로 내보내기'}
-              accessibilityState={{ disabled: !canExport, busy: exporting }}
-              hitSlop={4}
-              style={({ pressed }) => [
-                styles.exportButton,
-                { backgroundColor: pressed ? theme.canvasSoft2 : theme.canvasSoft, opacity: canExport ? 1 : 0.5 },
-              ]}>
-              {exporting ? (
-                <ActivityIndicator size="small" color={theme.body} />
-              ) : (
-                <Icon name="export" color={theme.body} size={16} />
-              )}
-              <Text style={[Type.micro, { color: theme.ink, fontWeight: 600 }]}>내보내기</Text>
-            </Pressable>
+              onPress={onExport}
+            />
           ) : null
         }
       />
 
       {exportError ? (
-        <Text style={[Type.micro, styles.exportError, { color: theme.danger }]}>
+        <Text variant="micro" tone="danger" style={styles.exportError}>
           파일을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.
         </Text>
       ) : null}
 
       {hasAny ? (
-        <View style={[styles.searchWrap, { backgroundColor: theme.canvasSoft }]}>
-          <Icon name="search" color={theme.mute} size={18} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="채팅 내용이나 닉네임으로 찾기"
-            placeholderTextColor={theme.mute}
-            returnKeyType="search"
-            style={[Type.body, styles.searchInput, { color: theme.ink }]}
-          />
-          {query ? (
-            <Pressable onPress={() => setQuery('')} hitSlop={10} accessibilityLabel="검색어 지우기">
-              <View style={[styles.clear, { backgroundColor: theme.canvasSoft2 }]}>
-                <Icon name="close" color={theme.body} size={12} />
-              </View>
-            </Pressable>
-          ) : null}
-        </View>
+        <SearchField
+          value={query}
+          onChangeText={setQuery}
+          placeholder="채팅 내용이나 닉네임으로 찾기"
+          style={styles.search}
+        />
       ) : null}
 
       {hasAny && searching && rows.length > 0 ? (
-        <Text style={[Type.micro, styles.scopeNote, { color: theme.mute }]}>
+        <Text variant="micro" tone="mute" style={styles.scopeNote}>
           내보내기를 누르면 찾은 채팅만 파일로 저장돼요
         </Text>
       ) : null}
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={theme.mute} />
-        </View>
+        <EmptyState loading />
       ) : !hasAny ? (
-        <View style={styles.center}>
-          <View style={[styles.emptyIcon, { backgroundColor: theme.canvasSoft }]}>
-            <Icon name="history" color={theme.mute} size={26} />
-          </View>
-          <Text style={[Type.bodyStrong, { color: theme.ink }]}>아직 저장된 채팅이 없어요</Text>
-          <Text style={[Type.label, styles.emptyHint, { color: theme.mute }]}>
-            이 채널의 채팅방을 열어 두면{'\n'}그때부터 채팅이 이 폰에 자동으로 저장돼요.
-          </Text>
+        <EmptyState
+          icon="history"
+          title="아직 저장된 채팅이 없어요"
+          hint={'이 채널의 채팅방을 열어 두면\n그때부터 채팅이 이 폰에 자동으로 저장돼요.'}>
           <Button label="보관 기간 설정" variant="secondary" onPress={() => router.push('/settings')} />
-        </View>
+        </EmptyState>
       ) : (
         // ponytail: FlatList like the chat room (see the note there); capped at LOG_LIMIT rows.
         <FlatList
@@ -207,26 +183,22 @@ export default function LogsScreen() {
           renderItem={({ item }) =>
             item.kind === 'header' ? (
               <View style={styles.groupHeader}>
-                <View style={[styles.groupPill, { backgroundColor: theme.canvasSoft }]}>
-                  <Text style={[Type.micro, { color: theme.body }]}>{item.label}</Text>
+                <View style={[styles.groupPill, { backgroundColor: theme.surface }]}>
+                  <Text variant="micro" tone="body">{item.label}</Text>
                 </View>
               </View>
             ) : (
               <View style={styles.row}>
-                <Text style={[Type.micro, styles.rowTime, { color: theme.mute }]}>{hhmm(item.row.msg_time)}</Text>
+                <Text variant="micro" tone="mute" style={styles.rowTime}>{hhmm(item.row.msg_time)}</Text>
                 <View style={styles.rowBody}>
                   <View style={styles.rowNickLine}>
-                    {item.row.type === 'donation' ? (
-                      <View style={[styles.donoTag, { backgroundColor: theme.primaryTint }]}>
-                        <Text style={[Type.badge, { color: theme.primarySoft }]}>후원</Text>
-                      </View>
-                    ) : null}
-                    <Text style={[Type.caption, styles.rowNick, { color: theme.body }]} numberOfLines={1}>
+                    {item.row.type === 'donation' ? <Tag label="후원" tone="accent" /> : null}
+                    <Text variant="captionStrong" tone="body" style={styles.rowNick} numberOfLines={1}>
                       {displayNickname(item.row.nickname, item.row.type)}
                     </Text>
                   </View>
                   {item.row.type === 'blinded' ? (
-                    <Text style={[Type.body, { color: theme.mute }]}>{BLINDED_TEXT}</Text>
+                    <Text variant="body" tone="mute">{BLINDED_TEXT}</Text>
                   ) : (
                     <EmojiText
                       text={item.row.message}
@@ -247,15 +219,13 @@ export default function LogsScreen() {
           ListFooterComponent={
             // Inverted: the footer sits at the visual top, above the oldest loaded day.
             rows.length >= LOG_LIMIT ? (
-              <Text style={[Type.micro, styles.limitNote, { color: theme.mute }]}>
+              <Text variant="micro" tone="mute" style={styles.limitNote}>
                 최근 {LOG_LIMIT.toLocaleString()}개까지 보여요. 더 오래된 채팅은 검색으로 찾아보세요.
               </Text>
             ) : null
           }
           ListEmptyComponent={
-            <View style={styles.center}>
-              <Text style={[Type.label, { color: theme.mute }]}>‘{debouncedQuery.trim()}’ 이(가) 들어간 채팅이 없어요</Text>
-            </View>
+            <EmptyState hint={`‘${debouncedQuery.trim()}’ 이(가) 들어간 채팅이 없어요`} />
           }
         />
       )}
@@ -265,19 +235,7 @@ export default function LogsScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  searchWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    height: TOUCH,
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.xs,
-    marginBottom: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    borderRadius: Radius.lg,
-  },
-  searchInput: { flex: 1, height: TOUCH, paddingVertical: 0 },
-  clear: { width: 20, height: 20, borderRadius: Radius.pill, alignItems: 'center', justifyContent: 'center' },
+  search: { marginHorizontal: Spacing.lg, marginTop: Spacing.xs, marginBottom: Spacing.sm },
   list: { flex: 1 },
   listContent: { flexGrow: 1, paddingVertical: Spacing.sm },
   groupHeader: { alignItems: 'center', paddingVertical: Spacing.md },
@@ -286,40 +244,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.md,
     paddingHorizontal: Spacing.lg,
-    paddingVertical: 6,
+    paddingVertical: Spacing.tight,
   },
-  rowTime: { width: 38, paddingTop: 3, fontVariant: ['tabular-nums'] },
+  // Centers the small time on the first line of the larger body text.
+  rowTime: {
+    width: Size.timeColumn,
+    paddingTop: (Type.body.lineHeight - Type.micro.lineHeight) / 2,
+    fontVariant: ['tabular-nums'],
+  },
   rowBody: { flex: 1, minWidth: 0 },
-  rowNickLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  rowNick: { flexShrink: 1, fontWeight: 600 },
-  donoTag: { paddingHorizontal: 5, paddingVertical: 1, borderRadius: Radius.xs },
-  exportButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    height: 34,
-    paddingHorizontal: Spacing.md,
-    marginRight: Spacing.xs,
-    borderRadius: Radius.pill,
-  },
+  rowNickLine: { flexDirection: 'row', alignItems: 'center', gap: Spacing.tight },
+  rowNick: { flexShrink: 1 },
   scopeNote: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xs },
   exportError: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xs },
   limitNote: { textAlign: 'center', paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.xxl,
-    paddingBottom: Spacing.xxxxxl,
-  },
-  emptyIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: Radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.xs,
-  },
-  emptyHint: { textAlign: 'center', fontWeight: 400, marginBottom: Spacing.sm },
 });

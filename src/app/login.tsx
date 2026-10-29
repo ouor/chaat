@@ -1,13 +1,15 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
 import { Button } from '@/components/ui/button';
 import { Icon, type IconName } from '@/components/ui/icon';
+import { IconTile } from '@/components/ui/icon-tile';
+import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/ui/screen-header';
-import { Radius, Spacing, Type } from '@/constants/tokens';
+import { Radius, Spacing } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
 import type { NaverCookies } from '@/store/auth-context';
@@ -95,7 +97,7 @@ export default function LoginScreen() {
       <View style={[styles.root, { backgroundColor: theme.canvas }]}>
         <ScreenHeader title="로그인" />
         <View style={styles.center}>
-          <Text style={[Type.label, { color: theme.mute }]}>웹에서는 네이버 로그인을 지원하지 않아요.</Text>
+          <Text variant="label" tone="mute">웹에서는 네이버 로그인을 지원하지 않아요.</Text>
         </View>
       </View>
     );
@@ -108,10 +110,10 @@ export default function LoginScreen() {
         // like an address bar and made the intro look like a (fake) Naver page.
         <ScreenHeader>
           <View style={styles.headerMain}>
-            <Text style={[Type.heading, { color: theme.ink }]}>네이버 로그인</Text>
-            <View style={[styles.domainPill, { backgroundColor: theme.canvasSoft }]}>
-              <Icon name="lock" color={theme.mute} size={13} />
-              <Text style={[Type.micro, { color: theme.body }]}>{host}</Text>
+            <Text variant="heading">네이버 로그인</Text>
+            <View style={[styles.domainPill, { backgroundColor: theme.surface }]}>
+              <Icon name="lock" color={theme.mute} size="xs" />
+              <Text variant="micro" tone="body">{host}</Text>
             </View>
           </View>
         </ScreenHeader>
@@ -122,17 +124,15 @@ export default function LoginScreen() {
       {phase === 'idle' ? (
         <>
           <ScrollView contentContainerStyle={styles.intro}>
-            <Text style={[Type.hero, { color: theme.ink }]}>채팅을 보내려면{'\n'}네이버 로그인이 필요해요</Text>
-            <Text style={[Type.body, { color: theme.body }]}>채팅 보기는 로그인 없이도 할 수 있어요.</Text>
+            <Text variant="hero">채팅을 보내려면{'\n'}네이버 로그인이 필요해요</Text>
+            <Text variant="body" tone="body">채팅 보기는 로그인 없이도 할 수 있어요.</Text>
             <View style={styles.points}>
               {POINTS.map((p) => (
                 <View key={p.title} style={styles.point}>
-                  <View style={[styles.pointIcon, { backgroundColor: theme.canvasSoft }]}>
-                    <Icon name={p.icon} color={theme.ink} size={20} />
-                  </View>
+                  <IconTile name={p.icon} size="lg" shape="rounded" />
                   <View style={styles.pointText}>
-                    <Text style={[Type.bodyStrong, { color: theme.ink }]}>{p.title}</Text>
-                    <Text style={[Type.label, { color: theme.mute, fontWeight: 400 }]}>{p.body}</Text>
+                    <Text variant="bodyStrong">{p.title}</Text>
+                    <Text variant="labelRegular" tone="mute">{p.body}</Text>
                   </View>
                 </View>
               ))}
@@ -146,8 +146,8 @@ export default function LoginScreen() {
       ) : phase === 'fail' ? (
         <>
           <View style={styles.center}>
-            <Text style={[Type.title, { color: theme.ink }]}>로그인을 마치지 못했어요</Text>
-            <Text style={[Type.label, styles.centerText, { color: theme.mute }]}>
+            <Text variant="title">로그인을 마치지 못했어요</Text>
+            <Text variant="labelRegular" tone="mute" style={styles.centerText}>
               로그인 창이 닫혔거나 로그인 정보를 받지 못했어요.{'\n'}로그인하지 않아도 채팅은 계속 볼 수 있어요.
             </Text>
           </View>
@@ -177,9 +177,9 @@ export default function LoginScreen() {
             style={styles.webview}
           />
           {loading || busy ? (
-            <View style={[styles.overlay, { backgroundColor: theme.canvas }]}>
+            <View style={[StyleSheet.absoluteFill, styles.overlay, { backgroundColor: theme.canvas }]}>
               <ActivityIndicator color={theme.primary} />
-              <Text style={[Type.label, { color: theme.body }]}>
+              <Text variant="label" tone="body">
                 {busy ? '로그인하는 중…' : '네이버 로그인 화면을 여는 중…'}
               </Text>
             </View>
@@ -196,29 +196,23 @@ const styles = StyleSheet.create({
   domainPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: Spacing.xs,
     paddingHorizontal: Spacing.md,
-    paddingVertical: 6,
+    paddingVertical: Spacing.xs,
     borderRadius: Radius.pill,
   },
   intro: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.xxl, gap: Spacing.md },
   points: { marginTop: Spacing.xxl, gap: Spacing.xl },
   point: { flexDirection: 'row', gap: Spacing.lg, alignItems: 'flex-start' },
-  pointIcon: { width: 44, height: 44, borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center' },
-  pointText: { flex: 1, gap: 2 },
+  pointText: { flex: 1, gap: Spacing.xxs },
   footer: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md, gap: Spacing.sm },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md, paddingHorizontal: Spacing.xxl },
-  centerText: { textAlign: 'center', fontWeight: 400 },
+  centerText: { textAlign: 'center' },
   webviewWrap: { flex: 1 },
   webview: { flex: 1 },
   overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+    gap: Spacing.md,
   },
 });

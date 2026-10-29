@@ -1,51 +1,40 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  KeyboardAvoidingView,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  type ViewToken,
-} from 'react-native';
+import { FlatList, KeyboardAvoidingView, Pressable, StyleSheet, TextInput, View, type ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { chatKey } from '@/client/chzzk/protocol';
 import type { ChatMessage } from '@/client/chzzk/types';
-import { ChatRow, ProfileThumb } from '@/components/chat/chat-row';
-import { ChannelAvatar } from '@/components/channel/channel-avatar';
-import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { ChatRow } from '@/components/chat/chat-row';
+import { NoticeComposer } from '@/components/chat/notice-composer';
+import { ProfileSheet } from '@/components/chat/profile-sheet';
+import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { LiveBadge } from '@/components/ui/live-badge';
 import { ScreenHeader } from '@/components/ui/screen-header';
-import { displayNickname } from '@/constants/chat-text';
-import { Radius, Spacing, TOUCH, Type } from '@/constants/tokens';
+import { Text } from '@/components/ui/text';
+import { Radius, Size, Spacing, TOUCH, Type } from '@/constants/tokens';
+import { useFollowNewest } from '@/hooks/use-follow-newest';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth-context';
-import { blindChat, clearChatNotice, postChatNotice, useChannelDetail, useProfileCard } from '@/store/channel';
+import { useChannelDetail } from '@/store/channel';
 import { useChatSession } from '@/store/chat-session';
 import { toggleFavorite, useFavorites } from '@/store/favorites';
 import { useMockChatSession } from '@/store/mock-chat-session';
-import { requestProfileImages, useProfileImage } from '@/store/profile-images';
+import { requestProfileImages } from '@/store/profile-images';
 
-const CONN_META: Record<string, { label: string; color: 'primarySoft' | 'mute' | 'danger' }> = {
+type StatusColor = 'accentText' | 'mute' | 'danger';
+
+const CONN_META: Record<string, { label: string; color: StatusColor }> = {
   connecting: { label: '연결 중…', color: 'mute' },
   connected: { label: '연결됨', color: 'mute' },
   reconnecting: { label: '다시 연결 중…', color: 'mute' },
   offline: { label: '연결 끊김', color: 'danger' },
   unavailable: { label: '채팅 없음', color: 'mute' },
-};
-
-const ROLE_LABEL: Record<ChatMessage['role'], string> = {
-  streamer: '스트리머',
-  manager: '채팅 매니저',
-  member: '시청자',
 };
 
 export default function ChatScreen() {
@@ -70,7 +59,8 @@ export default function ChatScreen() {
   const [draft, setDraft] = useState('');
   const [noticeOpen, setNoticeOpen] = useState(true);
   const [selected, setSelected] = useState<ChatMessage | null>(null);
-  const selectedImage = useProfileImage(selected && !selected.profileImageUrl ? selected.userIdHash : '');
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [readOnlyHidden, setReadOnlyHidden] = useState(false);
 
   // Avatars are backfilled only for rows on screen (see profile-images). FlatList forbids swapping
   // onViewableItemsChanged, so the handler is created once and reads the chat room id from a ref.
@@ -84,98 +74,28 @@ export default function ChatScreen() {
     const ids = viewableItems.flatMap((v) => (v.item && !v.item.profileImageUrl ? [v.item.userIdHash] : []));
     if (ids.length > 0) requestProfileImages(cid, ids);
   });
-  const [confirmBlind, setConfirmBlind] = useState(false);
-  // Moderation calls can fail (expired session, permission); say so instead of a dead button.
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [unread, setUnread] = useState(0);
-  const [composerOpen, setComposerOpen] = useState(false);
-  const [noticeDraft, setNoticeDraft] = useState('');
-  const [readOnlyHidden, setReadOnlyHidden] = useState(false);
 
   const image = detail?.channelImageUrl || fav?.channelImageUrl || null;
-  const profileCard = useProfileCard(chatChannelId, selected?.userIdHash ?? null, cookie);
-
   const data = useMemo(() => [...messages].reverse(), [messages]);
-
-  const listRef = useRef<FlatList<ChatMessage>>(null);
-  const atBottom = useRef(true);
-  // Mirrors atBottom for rendering: maintainVisibleContentPosition is on only while reading.
-  // Following the newest end needs nothing (new rows land at offset 0 of the inverted list); with
-  // it on, a busy room's batches shifted the offset and its animated autoscroll fired momentum
-  // events with no finger on the screen (logged on device), which read as "scrolled up".
-  const [following, setFollowing] = useState(true);
-  // Only a finger may leave or rejoin the newest end: a drag, or a fling right after one.
-  const userScrolling = useRef(false);
-  const flingUntil = useRef(0);
-  const lastNewest = useRef<string | null>(null);
-
-  // Count arrivals by how far the previous newest message moved, not by list length:
-  // once the store caps the list at MAX_MESSAGES the length stops changing. Matched by key, not
-  // identity: a blinded row is replaced by a new object and would read as "everything is new".
-  useEffect(() => {
-    const prev = lastNewest.current;
-    lastNewest.current = data[0] ? chatKey(data[0]) : null;
-    if (!prev || atBottom.current) return;
-    const idx = data.findIndex((m) => chatKey(m) === prev);
-    const delta = idx === -1 ? data.length : idx;
-    if (delta > 0) setUnread((u) => u + delta);
-  }, [data]);
-
-  function onScroll(e: {
-    nativeEvent: { contentOffset: { y: number } };
-  }) {
-    const y = e.nativeEvent.contentOffset.y;
-    if (!userScrolling.current) {
-      // Following the newest chat but the content drifted under a burst: pin it back.
-      if (atBottom.current && y > 1) listRef.current?.scrollToOffset({ offset: 0, animated: false });
-      return;
-    }
-    const bottom = y < 20;
-    if (bottom !== atBottom.current) {
-      atBottom.current = bottom;
-      setFollowing(bottom);
-      setReading(!bottom);
-      if (bottom) setUnread(0);
-    }
-  }
-
-  function jumpBottom() {
-    atBottom.current = true;
-    setFollowing(true);
-    setReading(false);
-    setUnread(0);
-    listRef.current?.scrollToOffset({ offset: 0, animated: true });
-  }
+  const { listProps, unread, jumpBottom } = useFollowNewest(data, setReading);
 
   const conn = CONN_META[connState] ?? CONN_META.connecting;
   const isLive = liveStatus === 'OPEN';
   const isEnded = liveStatus === 'CLOSE';
   // One short status, said once. Green only while live; an ended stream gets no dot at all.
-  const status: { label: string; dot: 'primarySoft' | 'mute' | 'danger' | null } =
+  const status: { label: string; dot: StatusColor | null } =
     connState !== 'connected'
       ? { label: conn.label, dot: conn.color }
       : isLive
-        ? { label: viewers != null ? `실시간 · ${viewers.toLocaleString()}명 시청 중` : '실시간', dot: 'primarySoft' }
+        ? { label: viewers != null ? `실시간 · ${viewers.toLocaleString()}명 시청 중` : '실시간', dot: 'accentText' }
         : isEnded
           ? { label: '방송 종료', dot: null }
           : { label: conn.label, dot: conn.color };
 
   const renderItem = useCallback(
-    ({ item }: { item: ChatMessage }) => (
-      <ChatRow
-        m={item}
-        emojiMap={emojiMap}
-        onPress={setSelected}
-      />
-    ),
+    ({ item }: { item: ChatMessage }) => <ChatRow m={item} emojiMap={emojiMap} onPress={setSelected} />,
     [emojiMap],
   );
-
-  function closeProfile() {
-    setActionError(null);
-    setSelected(null);
-    setConfirmBlind(false);
-  }
 
   function handleSend() {
     const text = draft.trim();
@@ -184,55 +104,11 @@ export default function ChatScreen() {
     if (sendChat(text)) setDraft('');
   }
 
-  function handleMention() {
-    if (!selected) return;
-    setDraft(`@${selected.nickname} `);
-    closeProfile();
-  }
-
-  function handleBlind() {
-    if (!selected || !chatChannelId || !cookie || !streamingChannelId) return;
-    if (!confirmBlind) {
-      setConfirmBlind(true);
-      return;
-    }
-    void blindChat({ chatChannelId, streamingChannelId, cookie }, selected)
-      .then(closeProfile)
-      .catch(() => setActionError('메시지를 가리지 못했어요. 잠시 후 다시 시도해 주세요.'));
-  }
-
-  function handlePostNotice() {
-    if (!chatChannelId || !cookie || !streamingChannelId || !uid) return;
-    const text = noticeDraft.trim();
-    if (!text) return;
-    void postChatNotice({ chatChannelId, streamingChannelId, cookie }, uid, text)
-      .then(() => {
-        setActionError(null);
-        setComposerOpen(false);
-        setNoticeDraft('');
-      })
-      .catch(() => setActionError('공지를 올리지 못했어요. 잠시 후 다시 시도해 주세요.'));
-  }
-
-  function handleClearNotice() {
-    if (!chatChannelId || !cookie || !streamingChannelId || !uid) return;
-    void clearChatNotice({ chatChannelId, streamingChannelId, cookie }, uid)
-      .then(() => {
-        setActionError(null);
-        setComposerOpen(false);
-      })
-      .catch(() => setActionError('공지를 내리지 못했어요. 잠시 후 다시 시도해 주세요.'));
-  }
-
+  const moderation =
+    canModerate && loggedIn && chatChannelId && streamingChannelId && cookie
+      ? { chatChannelId, streamingChannelId, cookie }
+      : null;
   const bottomPad = Math.max(insets.bottom, Spacing.md);
-  const selectedMeta = selected
-    ? profileCard?.streamingProperty.subscription
-      ? `구독 ${profileCard.streamingProperty.subscription.accumulativeMonth}개월 · ${ROLE_LABEL[selected.role]}`
-      : profileCard?.streamingProperty.following
-        ? `팔로우 중 · ${ROLE_LABEL[selected.role]}`
-        : ROLE_LABEL[selected.role]
-    : '';
-  const canBlind = canModerate && loggedIn && !!chatChannelId && !!streamingChannelId;
 
   return (
     // Edge-to-edge (edgeToEdgeEnabled) makes adjustResize a no-op, so the window no longer shrinks
@@ -249,35 +125,31 @@ export default function ChatScreen() {
                 toggleFavorite({ channelId, channelName: name || channelId, channelImageUrl: image ?? '' })
               }
             />
-            <Pressable
-              onPress={() => router.push({ pathname: '/logs/[channelId]', params: { channelId, name } })}
-              accessibilityRole="button"
+            <Button
+              label="지난 채팅"
+              size="chip"
+              variant="tonal"
+              icon="history"
               accessibilityLabel="이 폰에 저장된 지난 채팅 보기"
-              hitSlop={4}
-              style={({ pressed }) => [
-                styles.historyButton,
-                { backgroundColor: pressed ? theme.canvasSoft2 : theme.canvasSoft },
-              ]}>
-              <Icon name="history" color={theme.body} size={16} />
-              <Text style={[Type.micro, { color: theme.ink, fontWeight: 600 }]}>지난 채팅</Text>
-            </Pressable>
-            {canModerate && loggedIn ? (
+              onPress={() => router.push({ pathname: '/logs/[channelId]', params: { channelId, name } })}
+            />
+            {moderation ? (
               <IconButton name="megaphone" label="공지 올리기" color="body" onPress={() => setComposerOpen(true)} />
             ) : null}
           </>
         }>
         <View style={styles.headerMain}>
-          <ChannelAvatar uri={image} name={name || '?'} size={34} />
+          <Avatar uri={image} name={name || '?'} size="sm" />
           <View style={styles.headerTitle}>
             <View style={styles.headerTitleRow}>
-              <Text style={[Type.bodyStrong, styles.channelName, { color: theme.ink }]} numberOfLines={1}>
+              <Text variant="bodyStrong" style={styles.channelName} numberOfLines={1}>
                 {name}
               </Text>
               {isLive ? <LiveBadge /> : null}
             </View>
             <View style={styles.connRow}>
               {status.dot ? <View style={[styles.connDot, { backgroundColor: theme[status.dot] }]} /> : null}
-              <Text style={[Type.micro, { color: theme.body }]} numberOfLines={1}>
+              <Text variant="micro" tone="body" numberOfLines={1}>
                 {status.label}
               </Text>
             </View>
@@ -286,8 +158,10 @@ export default function ChatScreen() {
       </ScreenHeader>
 
       {connState === 'offline' ? (
-        <View style={[styles.banner, { backgroundColor: theme.canvasSoft }]}>
-          <Text style={[Type.label, styles.bannerText, { color: theme.ink }]}>연결이 끊겼어요</Text>
+        <View style={[styles.banner, { backgroundColor: theme.surface }]}>
+          <Text variant="label" style={styles.bannerText}>
+            연결이 끊겼어요
+          </Text>
           <Button label="다시 연결" size="sm" variant="secondary" onPress={retry} />
         </View>
       ) : null}
@@ -296,24 +170,24 @@ export default function ChatScreen() {
         <Pressable
           onPress={() => setNoticeOpen((v) => !v)}
           accessibilityLabel={noticeOpen ? '공지 접기' : '공지 펼치기'}
-          style={[styles.notice, { backgroundColor: theme.canvasSoft }]}>
-          <Icon name="megaphone" color={theme.ink} size={18} />
-          <Text style={[Type.label, styles.noticeText, { color: theme.ink }]} numberOfLines={noticeOpen ? undefined : 1}>
+          style={[styles.notice, { backgroundColor: theme.surface }]}>
+          <Icon name="megaphone" color={theme.ink} size="md" />
+          <Text variant="labelRegular" style={styles.noticeText} numberOfLines={noticeOpen ? undefined : 1}>
             {notice}
           </Text>
           <View style={{ transform: [{ rotate: noticeOpen ? '180deg' : '0deg' }] }}>
-            <Icon name="down" color={theme.mute} size={16} />
+            <Icon name="down" color={theme.mute} size="sm" />
           </View>
         </Pressable>
       ) : null}
 
       <View style={styles.listArea}>
-        {/* ponytail: FlatList (RN core), not FlashList 2 as AGENTS.md rule 5 asks: FlashList 2's
-            recycler + maintainVisibleContentPosition misrendered here (blank rows, forced scroll
-            to the bottom). Rows are memoized and the list is capped (500 / 2000 while reading).
+        {/* ponytail: FlatList (RN core), not FlashList 2: FlashList 2's recycler +
+            maintainVisibleContentPosition misrendered here (blank rows, forced scroll to the
+            bottom). Rows are memoized and the list is capped (500 / 2000 while reading).
             Upgrade path: retry FlashList 2 in a dev build with inverted-style chat. */}
         <FlatList
-          ref={listRef}
+          {...listProps}
           inverted
           data={data}
           // Content-based key (same identity as the store dedup): an index key would shift on every
@@ -321,93 +195,55 @@ export default function ChatScreen() {
           keyExtractor={chatKey}
           onViewableItemsChanged={onViewableItemsChanged}
           renderItem={renderItem}
-          onScroll={onScroll}
-          onScrollBeginDrag={() => {
-            userScrolling.current = true;
-          }}
-          onScrollEndDrag={() => {
-            userScrolling.current = false;
-            flingUntil.current = Date.now() + 150;
-          }}
-          // A fling starts right as the finger lifts; any other momentum is programmatic.
-          onMomentumScrollBegin={() => {
-            if (Date.now() < flingUntil.current) userScrolling.current = true;
-          }}
-          onMomentumScrollEnd={() => {
-            userScrolling.current = false;
-            flingUntil.current = 0;
-          }}
-          scrollEventThrottle={16}
           // Bursts of ~30 chats/s: render a smaller window around the viewport so each batch
           // updates fewer cells (default windowSize 21 = ten screens each way).
           windowSize={7}
           maxToRenderPerBatch={8}
-          // Scrolled up: keep the row being read in place as new chats land at index 0.
-          // Following: off, so new chats simply appear at the bottom (offset 0).
-          maintainVisibleContentPosition={following ? undefined : { minIndexForVisible: 0 }}
           style={styles.list}
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={
             // Inverted: the header sits at the newest end, in flow, so it never covers a row.
             isEnded && connState === 'connected' && data.length > 0 ? (
-              <Text style={[Type.caption, styles.endedNote, { color: theme.body }]}>
+              <Text variant="caption" tone="body" style={styles.endedNote}>
                 채팅방은 계속 열려 있어요. 새 채팅이 오면 바로 보여요.
               </Text>
             ) : null
           }
           ListEmptyComponent={
-            <View style={styles.empty}>
-              {connState === 'unavailable' && adultOnly ? (
-                <>
-                  <View style={[styles.emptyIcon, { backgroundColor: theme.canvasSoft }]}>
-                    <Icon name="lock" color={theme.mute} size={24} />
-                  </View>
-                  <Text style={[Type.bodyStrong, { color: theme.ink }]}>연령 제한 방송이에요</Text>
-                  <Text style={[Type.label, styles.emptyHint, { color: theme.mute }]}>
-                    {loggedIn
-                      ? '성인 인증을 마친 네이버 계정이어야 채팅을 볼 수 있어요.'
-                      : '네이버로 로그인하면 채팅을 볼 수 있어요. 성인 인증을 마친 계정이어야 해요.'}
-                  </Text>
-                  {loggedIn ? null : <Button label="로그인" onPress={() => router.push('/login')} />}
-                </>
-              ) : connState === 'unavailable' ? (
-                <>
-                  <View style={[styles.emptyIcon, { backgroundColor: theme.canvasSoft }]}>
-                    <Icon name="chat" color={theme.mute} size={24} />
-                  </View>
-                  <Text style={[Type.bodyStrong, { color: theme.ink }]}>이 채널은 채팅을 볼 수 없어요</Text>
-                  <Text style={[Type.label, styles.emptyHint, { color: theme.mute }]}>
-                    아직 방송한 적이 없거나 채팅이 막혀 있는 채널이에요.
-                  </Text>
-                </>
-              ) : connState === 'connected' ? (
-                <>
-                  <View style={[styles.emptyIcon, { backgroundColor: theme.canvasSoft }]}>
-                    <Icon name="chat" color={theme.mute} size={24} />
-                  </View>
-                  <Text style={[Type.bodyStrong, { color: theme.ink }]}>아직 채팅이 없어요</Text>
-                  <Text style={[Type.label, styles.emptyHint, { color: theme.mute }]}>
-                    새 채팅이 올라오면 바로 여기에 보여드릴게요.
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <ActivityIndicator color={theme.mute} />
-                  <Text style={[Type.label, { color: theme.mute }]}>{conn.label}</Text>
-                </>
-              )}
-            </View>
+            connState === 'unavailable' && adultOnly ? (
+              <EmptyState
+                icon="lock"
+                title="연령 제한 방송이에요"
+                hint={
+                  loggedIn
+                    ? '성인 인증을 마친 네이버 계정이어야 채팅을 볼 수 있어요.'
+                    : '네이버로 로그인하면 채팅을 볼 수 있어요. 성인 인증을 마친 계정이어야 해요.'
+                }>
+                {loggedIn ? null : <Button label="로그인" onPress={() => router.push('/login')} />}
+              </EmptyState>
+            ) : connState === 'unavailable' ? (
+              <EmptyState
+                icon="chat"
+                title="이 채널은 채팅을 볼 수 없어요"
+                hint="아직 방송한 적이 없거나 채팅이 막혀 있는 채널이에요."
+              />
+            ) : connState === 'connected' ? (
+              <EmptyState icon="chat" title="아직 채팅이 없어요" hint="새 채팅이 올라오면 바로 여기에 보여드릴게요." />
+            ) : (
+              <EmptyState loading title={conn.label} />
+            )
           }
         />
 
         {unread > 0 ? (
           <View pointerEvents="box-none" style={styles.unreadWrap}>
-            <Pressable onPress={jumpBottom} style={[styles.unreadButton, { backgroundColor: theme.ink }]}>
-              <Text style={[Type.label, { color: theme.canvas, fontWeight: 700 }]}>
-                새 메시지 {unread > 999 ? '999+' : unread}개
-              </Text>
-              <Icon name="down" color={theme.canvas} size={16} />
-            </Pressable>
+            <Button
+              label={`새 메시지 ${unread > 999 ? '999+' : unread}개`}
+              variant="inverse"
+              icon="down"
+              pill
+              onPress={jumpBottom}
+            />
           </View>
         ) : null}
       </View>
@@ -421,99 +257,44 @@ export default function ChatScreen() {
             placeholder="채팅 보내기"
             placeholderTextColor={theme.mute}
             returnKeyType="send"
-            style={[Type.body, styles.textInput, { backgroundColor: theme.canvasSoft, color: theme.ink }]}
+            style={[Type.body, styles.textInput, { backgroundColor: theme.surface, color: theme.ink }]}
           />
-          <Pressable
-            onPress={handleSend}
-            disabled={!draft.trim()}
-            accessibilityLabel="보내기"
-            style={[styles.sendButton, { backgroundColor: draft.trim() ? theme.primary : theme.canvasSoft2 }]}>
-            <Text style={[Type.label, { fontWeight: 700, color: draft.trim() ? theme.onPrimary : theme.mute }]}>전송</Text>
-          </Pressable>
+          <View style={styles.send}>
+            <Button label="전송" accessibilityLabel="보내기" pill disabled={!draft.trim()} onPress={handleSend} />
+          </View>
         </View>
       ) : !readOnlyHidden ? (
         <View style={[styles.inputBar, { paddingBottom: bottomPad, borderTopColor: theme.hairline }]}>
-          <Icon name="lock" color={theme.mute} size={18} />
+          <Icon name="lock" color={theme.mute} size="md" />
           <View style={styles.readOnlyText}>
-            <Text style={[Type.label, { color: theme.ink, fontWeight: 600 }]}>보기만 하는 중이에요</Text>
-            <Text style={[Type.micro, { color: theme.mute, fontWeight: 400 }]}>채팅을 보내려면 로그인해 주세요</Text>
+            <Text variant="labelStrong">보기만 하는 중이에요</Text>
+            <Text variant="micro" tone="mute">
+              채팅을 보내려면 로그인해 주세요
+            </Text>
           </View>
           <Button label="로그인" size="sm" onPress={() => router.push('/login')} />
-          <IconButton name="close" label="안내 닫기" color="mute" size={18} onPress={() => setReadOnlyHidden(true)} />
+          <IconButton name="close" label="안내 닫기" color="mute" size="md" onPress={() => setReadOnlyHidden(true)} />
         </View>
       ) : (
         <View style={{ height: insets.bottom }} />
       )}
 
-      <BottomSheet
+      <NoticeComposer
         visible={composerOpen}
-        onClose={() => {
-          setActionError(null);
-          setComposerOpen(false);
-        }}>
-        <View style={styles.sheetBody}>
-          <View style={styles.sheetIntro}>
-            <Text style={[Type.title, { color: theme.ink }]}>공지 올리기</Text>
-            <Text style={[Type.label, { color: theme.mute, fontWeight: 400 }]}>
-              채팅창 맨 위에 고정돼서 모든 시청자에게 보여요.
-            </Text>
-          </View>
-          <TextInput
-            value={noticeDraft}
-            onChangeText={setNoticeDraft}
-            placeholder="공지 내용을 입력하세요"
-            placeholderTextColor={theme.mute}
-            multiline
-            style={[Type.body, styles.composerInput, { backgroundColor: theme.canvas, color: theme.ink }]}
-          />
-          {actionError ? <Text style={[Type.label, { color: theme.danger }]}>{actionError}</Text> : null}
-          <View style={styles.sheetActions}>
-            {notice ? <Button label="지금 공지 내리기" variant="danger" stretch onPress={handleClearNotice} /> : null}
-            <Button label="올리기" stretch onPress={handlePostNotice} />
-          </View>
-        </View>
-      </BottomSheet>
+        onClose={() => setComposerOpen(false)}
+        target={moderation}
+        uid={uid}
+        hasNotice={!!notice}
+      />
 
-      <BottomSheet visible={!!selected} onClose={closeProfile}>
-        {selected ? (
-          <View style={styles.sheetBody}>
-            <View style={styles.sheetHead}>
-              <ProfileThumb
-                uri={selected.profileImageUrl || selectedImage}
-                name={displayNickname(selected.nickname, selected.msgType)}
-                size={52}
-              />
-              <View style={styles.sheetTitle}>
-                <Text style={[Type.title, { color: theme.ink }]} numberOfLines={1}>
-                  {displayNickname(selected.nickname, selected.msgType)}
-                </Text>
-                <Text style={[Type.caption, { color: theme.mute }]}>{selectedMeta}</Text>
-              </View>
-            </View>
-            {selected.message ? (
-              <View style={[styles.sheetMsg, { backgroundColor: theme.canvas }]}>
-                <Text style={[Type.body, { color: theme.ink }]}>{selected.message}</Text>
-              </View>
-            ) : null}
-            {actionError ? <Text style={[Type.label, { color: theme.danger }]}>{actionError}</Text> : null}
-            <View style={styles.sheetActions}>
-              {canBlind ? (
-                <Button
-                  label={confirmBlind ? '한 번 더 누르면 가려져요' : '메시지 가리기'}
-                  variant="danger"
-                  stretch
-                  onPress={handleBlind}
-                />
-              ) : null}
-              {loggedIn ? (
-                <Button label="멘션하기" stretch onPress={handleMention} />
-              ) : (
-                <Button label="닫기" variant="secondary" stretch onPress={closeProfile} />
-              )}
-            </View>
-          </View>
-        ) : null}
-      </BottomSheet>
+      <ProfileSheet
+        message={selected}
+        chatChannelId={chatChannelId}
+        cookie={cookie}
+        moderation={moderation}
+        onMention={loggedIn ? (nickname) => setDraft(`@${nickname} `) : undefined}
+        onClose={() => setSelected(null)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -522,10 +303,10 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   headerMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   headerTitle: { flex: 1, minWidth: 0 },
-  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.tight },
   channelName: { flexShrink: 1 },
-  connRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  connDot: { width: 6, height: 6, borderRadius: Radius.pill },
+  connRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  connDot: { width: Size.dot, height: Size.dot, borderRadius: Radius.pill },
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -544,49 +325,15 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     marginHorizontal: Spacing.md,
     marginBottom: Spacing.xs,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+    padding: Spacing.md,
     borderRadius: Radius.lg,
   },
-  noticeText: { flex: 1, fontWeight: 400 },
+  noticeText: { flex: 1 },
   endedNote: { textAlign: 'center', paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md },
-  historyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    height: 34,
-    paddingHorizontal: Spacing.md,
-    marginRight: Spacing.xs,
-    borderRadius: Radius.pill,
-  },
   listArea: { flex: 1 },
   list: { flex: 1 },
   listContent: { flexGrow: 1, paddingVertical: Spacing.xs },
-  empty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.xxxxl,
-  },
-  emptyIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: Radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.xs,
-  },
-  emptyHint: { textAlign: 'center', fontWeight: 400 },
   unreadWrap: { position: 'absolute', left: 0, right: 0, bottom: Spacing.md, alignItems: 'center' },
-  unreadButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    height: 40,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: Radius.pill,
-  },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -604,29 +351,5 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
     borderRadius: Radius.pill,
   },
-  sendButton: {
-    height: TOUCH,
-    paddingHorizontal: Spacing.lg,
-    marginRight: Spacing.sm,
-    borderRadius: Radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sheetBody: { gap: Spacing.lg },
-  sheetIntro: { gap: Spacing.xs },
-  composerInput: {
-    minHeight: 96,
-    borderRadius: Radius.lg,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    textAlignVertical: 'top',
-  },
-  sheetHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
-  sheetTitle: { flex: 1, gap: 2 },
-  sheetMsg: {
-    borderRadius: Radius.lg,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-  },
-  sheetActions: { flexDirection: 'row', gap: Spacing.sm },
+  send: { marginRight: Spacing.sm },
 });

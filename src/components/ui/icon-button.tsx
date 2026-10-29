@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet } from 'react-native';
 
 import { Icon, type IconName } from '@/components/ui/icon';
-import { Radius, TOUCH, type ThemeColor } from '@/constants/tokens';
+import { Radius, TOUCH, type IconSizeName } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
 /** A 44dp round icon target with a pressed tint. `label` is read by screen readers. */
@@ -10,13 +10,13 @@ export function IconButton({
   label,
   onPress,
   color = 'ink',
-  size = 22,
+  size = 'lg',
 }: {
   name: IconName;
   label: string;
   onPress: () => void;
-  color?: ThemeColor;
-  size?: number;
+  color?: 'ink' | 'body' | 'mute';
+  size?: IconSizeName;
 }) {
   const theme = useTheme();
   return (
@@ -25,7 +25,7 @@ export function IconButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       hitSlop={4}
-      style={({ pressed }) => [styles.button, pressed && { backgroundColor: theme.canvasSoft2 }]}>
+      style={({ pressed }) => [styles.button, pressed && { backgroundColor: theme.surfaceRaised }]}>
       <Icon name={name} color={theme[color]} size={size} />
     </Pressable>
   );

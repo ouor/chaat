@@ -1,17 +1,28 @@
 import { KeyboardAvoidingView, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Radius, Spacing } from '@/constants/tokens';
+import { Text } from '@/components/ui/text';
+import { Radius, Size, Spacing } from '@/constants/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
+/**
+ * Modal sheet from the bottom. `title`/`description` form the standard heading, `children` the
+ * body, and `actions` (Buttons with `stretch`) the button row at the end.
+ */
 export function BottomSheet({
   visible,
   onClose,
+  title,
+  description,
+  actions,
   children,
 }: {
   visible: boolean;
   onClose: () => void;
-  children: React.ReactNode;
+  title?: string;
+  description?: string;
+  actions?: React.ReactNode;
+  children?: React.ReactNode;
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -24,10 +35,21 @@ export function BottomSheet({
         <View
           style={[
             styles.sheet,
-            { backgroundColor: theme.canvasSoft, paddingBottom: Math.max(insets.bottom, Spacing.lg) + Spacing.sm },
+            { backgroundColor: theme.surface, paddingBottom: Math.max(insets.bottom, Spacing.lg) + Spacing.sm },
           ]}>
-          <View style={[styles.handle, { backgroundColor: theme.canvasSoft2 }]} />
+          <View style={[styles.handle, { backgroundColor: theme.surfaceRaised }]} />
+          {title || description ? (
+            <View style={styles.heading}>
+              {title ? <Text variant="title">{title}</Text> : null}
+              {description ? (
+                <Text variant="labelRegular" tone="mute">
+                  {description}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
           {children}
+          {actions ? <View style={styles.actions}>{actions}</View> : null}
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -40,16 +62,17 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    borderTopLeftRadius: Radius.xl + 8,
-    borderTopRightRadius: Radius.xl + 8,
+    borderTopLeftRadius: Radius.xxl,
+    borderTopRightRadius: Radius.xxl,
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.sm,
+    gap: Spacing.lg,
   },
   handle: {
     alignSelf: 'center',
-    width: 36,
-    height: 4,
+    ...Size.sheetHandle,
     borderRadius: Radius.pill,
-    marginBottom: Spacing.lg,
   },
+  heading: { gap: Spacing.xs },
+  actions: { flexDirection: 'row', gap: Spacing.sm },
 });

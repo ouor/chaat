@@ -1,0 +1,68 @@
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+
+import { type IconName } from '@/components/ui/icon';
+import { IconTile } from '@/components/ui/icon-tile';
+import { Text } from '@/components/ui/text';
+import { Spacing } from '@/constants/tokens';
+import { useTheme } from '@/hooks/use-theme';
+
+/**
+ * Centered placeholder for a screen or list with nothing to show: optional icon, a title, a hint
+ * and an action (`children`). `loading` shows a spinner with `title` as its caption instead.
+ */
+export function EmptyState({
+  icon,
+  title,
+  hint,
+  loading = false,
+  children,
+}: {
+  icon?: IconName;
+  title?: string;
+  hint?: string;
+  loading?: boolean;
+  children?: React.ReactNode;
+}) {
+  const theme = useTheme();
+  if (loading) {
+    return (
+      <View style={styles.wrap}>
+        <ActivityIndicator color={theme.mute} />
+        {title ? (
+          <Text variant="label" tone="mute">
+            {title}
+          </Text>
+        ) : null}
+      </View>
+    );
+  }
+  return (
+    <View style={styles.wrap}>
+      {icon ? (
+        <View style={styles.icon}>
+          <IconTile name={icon} size="xl" tone="mute" />
+        </View>
+      ) : null}
+      {title ? <Text variant="bodyStrong">{title}</Text> : null}
+      {hint ? (
+        <Text variant="labelRegular" tone="mute" style={styles.hint}>
+          {hint}
+        </Text>
+      ) : null}
+      {children}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  wrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.xxxxl,
+    paddingVertical: Spacing.xxxxxl,
+  },
+  icon: { marginBottom: Spacing.xs },
+  hint: { textAlign: 'center', marginBottom: Spacing.sm },
+});
