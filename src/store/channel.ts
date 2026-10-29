@@ -1,25 +1,16 @@
 import { useEffect, useState } from 'react';
 
 import {
-  blindMessage,
-  deleteNotice,
+  chatAction,
   getChannel,
   getLiveStatus,
   getProfileCard,
-  postNotice,
   searchChannels,
-  type NoticePayload,
   type ProfileCard,
-  type SearchResult,
 } from '@/client/chzzk/rest';
 import type { ChannelDetail } from '@/client/chzzk/types';
 
-export type { ProfileCard, SearchResult };
-
-/** One page of channel search results. */
-export function searchChannelPage(query: string, size: number, offset = 0): Promise<SearchResult> {
-  return searchChannels(query, { size, offset });
-}
+export { searchChannels };
 
 export type LiveSummary = { open: boolean; viewers: number } | { failed: true };
 
@@ -89,7 +80,7 @@ export interface ModerationTarget {
 }
 
 export function blindChat(t: ModerationTarget, m: { message: string; msgTime: number; userIdHash: string }): Promise<void> {
-  return blindMessage(t.chatChannelId, t.cookie, {
+  return chatAction('blind', t.chatChannelId, t.cookie, {
     message: m.message,
     messageTime: m.msgTime,
     messageUserIdHash: m.userIdHash,
@@ -98,11 +89,13 @@ export function blindChat(t: ModerationTarget, m: { message: string; msgTime: nu
 }
 
 export function postChatNotice(t: ModerationTarget, uid: string, text: string): Promise<void> {
-  const p: NoticePayload = { message: text, messageTime: Date.now(), messageUserIdHash: uid, streamingChannelId: t.streamingChannelId };
-  return postNotice(t.chatChannelId, t.cookie, p);
+  return chatAction('postNotice', t.chatChannelId, t.cookie, notice(t, uid, text));
 }
 
 export function clearChatNotice(t: ModerationTarget, uid: string): Promise<void> {
-  const p: NoticePayload = { message: '', messageTime: Date.now(), messageUserIdHash: uid, streamingChannelId: t.streamingChannelId };
-  return deleteNotice(t.chatChannelId, t.cookie, p);
+  return chatAction('clearNotice', t.chatChannelId, t.cookie, notice(t, uid, ''));
+}
+
+function notice(t: ModerationTarget, uid: string, message: string) {
+  return { message, messageTime: Date.now(), messageUserIdHash: uid, streamingChannelId: t.streamingChannelId };
 }

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { searchChannelPage, type SearchResult } from '@/store/channel';
+import { searchChannels } from '@/store/channel';
 import type { SearchChannel } from '@/client/chzzk/types';
 import { ChannelAvatar } from '@/components/channel/channel-avatar';
 import { Button } from '@/components/ui/button';
@@ -72,8 +72,8 @@ export default function SearchScreen() {
       setInitialLoading(true);
       setFailed(false);
       setShowSmall(false);
-      searchChannelPage(query, PAGE_SIZE)
-        .then((res: SearchResult) => {
+      searchChannels(query, { size: PAGE_SIZE })
+        .then((res) => {
           if (cancelled) return;
           setResults(res.data);
           setNextOffset(res.nextOffset);
@@ -98,8 +98,8 @@ export default function SearchScreen() {
     if (!query || !nextOffset || loadingMore || initialLoading) return;
     setLoadingMore(true);
     const gen = listGen.current;
-    searchChannelPage(query, PAGE_SIZE, nextOffset)
-      .then((res: SearchResult) => {
+    searchChannels(query, { size: PAGE_SIZE, offset: nextOffset })
+      .then((res) => {
         if (gen !== listGen.current) return;
         setResults((prev) => [...prev, ...res.data]);
         setNextOffset(res.nextOffset);

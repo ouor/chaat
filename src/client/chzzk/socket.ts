@@ -11,21 +11,16 @@ import {
   recentChatMessage,
   sendChatMessage,
 } from './protocol';
-import type { ChatMessage } from './types';
+import type { AccessToken, ChatMessage } from './types';
 
 export type ConnState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'offline';
-
-export interface ChatTokens {
-  accessToken: string;
-  extraToken: string;
-}
 
 export interface ChatSocketOptions {
   chatChannelId: string;
   /** The streamer's channel id; outgoing chats must name it (not the chat room id). */
   streamingChannelId: string;
   /** Called on every (re)connect so a reconnect never reuses an expired token. */
-  getAccessToken: () => Promise<ChatTokens>;
+  getAccessToken: () => Promise<Pick<AccessToken, 'accessToken' | 'extraToken'>>;
   uid?: string;
   onMessage: (m: ChatMessage) => void;
   onNotice?: (text: string) => void;
@@ -153,18 +148,11 @@ export class ChatSocket {
     this.closed = true;
     this.gen += 1;
     this.openingSince = 0;
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
     if (this.watchdogTimer) {
       clearInterval(this.watchdogTimer);
       this.watchdogTimer = null;
     }
-    this.stopPing();
-    const ws = this.ws;
-    this.ws = null;
-    ws?.close();
+    this.dropSocket();
     this.setState('offline');
   }
 
@@ -290,22 +278,21 @@ export class ChatSocket {
 
   /** Drop the current socket without waiting for its close handshake (a dead TCP never answers). */
   private reconnectNow(): void {
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-    const ws = this.ws;
-    this.ws = null;
-    ws?.close();
-    this.stopPing();
-    this.sid = undefined;
-    this.connectedAt = 0;
+    this.dropSocket();
     void this.openSocket();
   }
 
   /** Drops the connection (or an open in flight) until the next foreground. */
   private suspend(): void {
     this.gen += 1;
+    this.dropSocket();
+    this.openingSince = 0;
+    this.resumeOnForeground = true;
+    this.setState('reconnecting');
+  }
+
+  /** Forgets the current connection and any pending reconnect; per-connection state starts over. */
+  private dropSocket(): void {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -316,9 +303,6 @@ export class ChatSocket {
     this.stopPing();
     this.sid = undefined;
     this.connectedAt = 0;
-    this.openingSince = 0;
-    this.resumeOnForeground = true;
-    this.setState('reconnecting');
   }
 
   private checkLiveness(): void {

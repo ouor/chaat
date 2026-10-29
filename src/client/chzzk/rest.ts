@@ -1,4 +1,4 @@
-import { isRecord, isTrustedImageUrl } from './protocol';
+import { isRecord, isTrustedImageUrl } from './guards';
 import type { AccessToken, ChannelDetail, LiveStatus, SearchChannel, UserStatus } from './types';
 
 const SERVICE_BASE = 'https://api.chzzk.naver.com';
@@ -31,18 +31,9 @@ function unexpected(what: string): never {
 }
 
 function qs(params: Record<string, string | number>): string {
-  const entries = Object.entries(params).filter(([, v]) => v !== undefined);
+  const entries = Object.entries(params);
   if (entries.length === 0) return '';
   return '?' + entries.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
-}
-
-async function get(
-  base: string,
-  path: string,
-  params: Record<string, string | number>,
-  cookie?: string,
-): Promise<unknown> {
-  return request(base, path, { params, cookie });
 }
 
 async function request(
@@ -125,10 +116,8 @@ export function searchChannels(
   keyword: string,
   opts: { size?: number; offset?: number } = {},
 ): Promise<SearchResult> {
-  return get(SERVICE_BASE, '/service/v1/search/channels', {
-    keyword,
-    size: opts.size ?? 20,
-    offset: opts.offset ?? 0,
+  return request(SERVICE_BASE, '/service/v1/search/channels', {
+    params: { keyword, size: opts.size ?? 20, offset: opts.offset ?? 0 },
   }).then((c) => {
     if (!isRecord(c)) unexpected('search');
     const data: SearchChannel[] = [];
@@ -146,7 +135,7 @@ export function searchChannels(
  * age-restricted stream comes back without its chatChannelId.
  */
 export async function getLiveStatus(channelId: string, cookie?: string): Promise<LiveStatus> {
-  return get(SERVICE_BASE, `/polling/v2/channels/${channelPath(channelId)}/live-status`, {}, cookie).then((c) => {
+  return request(SERVICE_BASE, `/polling/v2/channels/${channelPath(channelId)}/live-status`, { cookie }).then((c) => {
     // A channel that has never streamed answers code 200 with content: null (verified against
     // a raw response): no live, no chat room — not an error.
     if (c === null) return { channelId, status: 'CLOSE', concurrentUserCount: 0, chatChannelId: null, adult: false };
@@ -164,13 +153,13 @@ export async function getLiveStatus(channelId: string, cookie?: string): Promise
 
 export async function getChannel(channelId: string): Promise<ChannelDetail> {
   // content IS the channel (verified against a raw response), not wrapped in { channel }.
-  return get(SERVICE_BASE, `/service/v1/channels/${channelPath(channelId)}`, {}).then(
+  return request(SERVICE_BASE, `/service/v1/channels/${channelPath(channelId)}`).then(
     (c) => parseChannel(c) ?? unexpected('channel'),
   );
 }
 
 export function getAccessToken(chatChannelId: string, cookie?: string): Promise<AccessToken> {
-  return get(GAME_BASE, '/v1/chats/access-token', { channelId: chatChannelId, chatType: 'STREAMING' }, cookie).then(
+  return request(GAME_BASE, '/v1/chats/access-token', { params: { channelId: chatChannelId, chatType: 'STREAMING' }, cookie }).then(
     (c) => {
       if (!isRecord(c) || typeof c.accessToken !== 'string' || !c.accessToken) unexpected('access-token');
       return { accessToken: c.accessToken, extraToken: str(c.extraToken), realNameAuth: c.realNameAuth === true };
@@ -180,42 +169,32 @@ export function getAccessToken(chatChannelId: string, cookie?: string): Promise<
 
 /** The user hash becomes the socket uid and gates sending; a session without one isn't signed in. */
 export function getUserStatus(cookie: string): Promise<UserStatus> {
-  return get(GAME_BASE, '/v1/user/getUserStatus', {}, cookie).then((c) => {
+  return request(GAME_BASE, '/v1/user/getUserStatus', { cookie }).then((c) => {
     if (!isRecord(c)) unexpected('user-status');
     const userIdHash = str(c.userIdHash);
     return { userIdHash, loggedIn: c.loggedIn === true && userIdHash.length > 0 };
   });
 }
 
-export interface NoticePayload {
+/** Body of a moderator action on one chat (post/clear notice, blind). */
+export interface ChatActionPayload {
   message: string;
   messageTime: number;
   messageUserIdHash: string;
   streamingChannelId: string;
 }
 
-export async function postNotice(chatChannelId: string, cookie: string, p: NoticePayload): Promise<void> {
-  await request(GAME_BASE, '/v1/chats/notices', {
-    method: 'POST',
-    cookie,
-    body: { channelId: chatChannelId, chatType: 'STREAMING', ...p },
-  });
-}
+export type ChatAction = 'postNotice' | 'clearNotice' | 'blind';
 
-export async function deleteNotice(chatChannelId: string, cookie: string, p: NoticePayload): Promise<void> {
-  await request(GAME_BASE, '/v1/chats/notices', {
-    method: 'DELETE',
-    cookie,
-    body: { channelId: chatChannelId, chatType: 'STREAMING', ...p },
-  });
-}
+const CHAT_ACTION = {
+  postNotice: { method: 'POST', path: '/v1/chats/notices' },
+  clearNotice: { method: 'DELETE', path: '/v1/chats/notices' },
+  blind: { method: 'POST', path: '/v1/chats/blind-message' },
+} as const;
 
-export async function blindMessage(chatChannelId: string, cookie: string, p: NoticePayload): Promise<void> {
-  await request(GAME_BASE, '/v1/chats/blind-message', {
-    method: 'POST',
-    cookie,
-    body: { channelId: chatChannelId, chatType: 'STREAMING', ...p },
-  });
+export async function chatAction(action: ChatAction, chatChannelId: string, cookie: string, p: ChatActionPayload): Promise<void> {
+  const { method, path } = CHAT_ACTION[action];
+  await request(GAME_BASE, path, { method, cookie, body: { channelId: chatChannelId, chatType: 'STREAMING', ...p } });
 }
 
 export interface ProfileCard {
@@ -233,11 +212,10 @@ export interface ProfileCard {
 }
 
 export function getProfileCard(chatChannelId: string, userIdHash: string, cookie?: string): Promise<ProfileCard> {
-  return get(
+  return request(
     GAME_BASE,
     `/v1/chats/${encodeURIComponent(chatChannelId)}/users/${encodeURIComponent(userIdHash)}/profile-card`,
-    { chatType: 'STREAMING' },
-    cookie,
+    { params: { chatType: 'STREAMING' }, cookie },
   ).then((pc) => {
     if (!isRecord(pc)) unexpected('profile-card');
     // streamingProperty and its parts are optional/nullable in practice; the screen reads them.
@@ -271,7 +249,7 @@ const PACK_LISTS = ['emojiPacks', 'cheatKeyEmojiPacks', 'subscriptionEmojiPacks'
 const PACK_EMOJIS = ['emojis', 'tier1Emojis', 'tier2Emojis'] as const;
 
 export async function getEmojiPacks(channelId: string, cookie?: string): Promise<{ emojiId: string; imageUrl: string }[]> {
-  return get(SERVICE_BASE, `/service/v1/channels/${channelPath(channelId)}/emoji-packs`, {}, cookie).then((c) => {
+  return request(SERVICE_BASE, `/service/v1/channels/${channelPath(channelId)}/emoji-packs`, { cookie }).then((c) => {
     if (!isRecord(c)) unexpected('emoji-packs');
     const out: { emojiId: string; imageUrl: string }[] = [];
     for (const list of PACK_LISTS) {

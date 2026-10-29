@@ -27,7 +27,6 @@ export interface AccessToken {
   accessToken: string;
   extraToken: string;
   realNameAuth: boolean;
-  temporaryRestrict?: { temporaryRestrict: boolean; times: number } | null;
 }
 
 export interface UserStatus {
