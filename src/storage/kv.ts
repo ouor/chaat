@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 
-// ponytail: Expo Go lacks the mmkv native module (Nitro). Lazy-require + in-memory
+// shortcut: Expo Go lacks the mmkv native module (Nitro). Lazy-require + in-memory
 // fallback keeps the app runnable in Expo Go; real builds use MMKV. Upgrade path: none needed.
 interface MmkvLike {
   getString(key: string): string | undefined;

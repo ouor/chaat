@@ -1,6 +1,6 @@
 const SERVICE = 'chaat.naver-cookie';
 
-// ponytail: Expo Go lacks react-native-keychain's native module. Lazy-require keeps the
+// shortcut: Expo Go lacks react-native-keychain's native module. Lazy-require keeps the
 // import from throwing; in-memory fallback is debug-only. Real devices always use keychain.
 type KeychainModule = typeof import('react-native-keychain');
 

@@ -1,6 +1,6 @@
 import type { NaverCookies } from './keychain';
 
-// ponytail: NID_AUT/NID_SES are HttpOnly so document.cookie can't see them. Reading the
+// shortcut: NID_AUT/NID_SES are HttpOnly so document.cookie can't see them. Reading the
 // WebView's shared cookie store needs a native module. Lazy-require keeps the import safe;
 // if the module isn't available (Expo Go / new-arch interop missing) this returns null.
 // Upgrade path: a local Expo module if the interop stops working.

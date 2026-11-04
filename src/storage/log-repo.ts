@@ -29,7 +29,7 @@ interface PendingLog {
 
 const buffer: PendingLog[] = [];
 const FLUSH_MS = 1000;
-// ponytail: if the DB keeps failing, failed batches are re-queued up to this many rows and the
+// shortcut: if the DB keeps failing, failed batches are re-queued up to this many rows and the
 // oldest are dropped past it, so a dead DB can't grow memory until the app is killed (losing all).
 // Upgrade path: spill to a file if a persistently failing DB ever shows up in practice.
 const MAX_BUFFER = 20000;
@@ -158,7 +158,7 @@ export interface LogRow {
 
 type StoredRow = Omit<LogRow, 'emojis'> & { extras_json: string | null };
 
-// ponytail: the viewer shows only the newest LOG_LIMIT matching rows; older ones are reachable
+// shortcut: the viewer shows only the newest LOG_LIMIT matching rows; older ones are reachable
 // by narrowing the search. Upgrade path: keyset pagination on msg_time when scrolling up.
 export const LOG_LIMIT = 2000;
 

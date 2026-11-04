@@ -176,7 +176,7 @@ export default function LogsScreen() {
           <Button label="보관 기간 설정" variant="secondary" onPress={() => router.push('/settings')} />
         </EmptyState>
       ) : (
-        // ponytail: FlatList like the chat room (see the note there); capped at LOG_LIMIT rows.
+        // shortcut: FlatList like the chat room (see the note there); capped at LOG_LIMIT rows.
         <FlatList
           inverted
           data={entries}

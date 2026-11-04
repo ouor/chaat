@@ -182,7 +182,7 @@ export default function ChatScreen() {
       ) : null}
 
       <View style={styles.listArea}>
-        {/* ponytail: FlatList (RN core), not FlashList 2: FlashList 2's recycler +
+        {/* shortcut: FlatList (RN core), not FlashList 2: FlashList 2's recycler +
             maintainVisibleContentPosition misrendered here (blank rows, forced scroll to the
             bottom). Rows are memoized and the list is capped (500 / 2000 while reading).
             Upgrade path: retry FlashList 2 in a dev build with inverted-style chat. */}
