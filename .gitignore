@@ -18,6 +18,7 @@ expo-env.d.ts
 *.key
 *.keystore
 *.mobileprovision
+*.pem
 
 # Metro
 .metro-health-check*
@@ -29,7 +30,6 @@ yarn-error.*
 
 # macOS
 .DS_Store
-*.pem
 
 # local env files
 .env
@@ -38,8 +38,6 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-example
-
 # generated native folders
 /ios
 /android
@@ -47,6 +45,14 @@ example
 # local Expo module build output
 modules/*/android/build/
 
-# release signing secrets (see signing/SIGNING.md)
+# release signing secrets (see docs/dev/SIGNING.md)
 signing/release.p12
 signing/keystore.properties
+
+# local-only: developer docs, design exports, AI tool config
+/docs/dev/
+/design/
+/.claude/
+/opencode.json
+/CLAUDE.md
+/AGENTS.md

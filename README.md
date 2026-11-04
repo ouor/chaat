@@ -104,7 +104,15 @@ PC에서 `apksigner verify --print-certs chaat-*.apk`로 확인할 수 있어요
 
 여기부터는 앱을 직접 빌드하거나 고치려는 분을 위한 내용이에요.
 
-- 빌드 방법과 구조: [docs/BUILDING.md](docs/BUILDING.md)
+- 빌드 (Node.js 20.19+, JDK 17, Android SDK)
+
+  ```bash
+  npm install
+  npx expo run:android   # 개발 빌드를 휴대폰이나 에뮬레이터에서 실행
+  npm run check          # 프로토콜·소켓·CSV 검사
+  ```
+
+  릴리스 APK는 개발자 서명 키가 있어야 만들 수 있어요. 키 없이 빌드하면 디버그 키로 서명돼요.
 - 쓰인 기술
   - 앱: React Native, Expo (expo-router)
   - 채팅: 치지직 채팅 WebSocket, REST
